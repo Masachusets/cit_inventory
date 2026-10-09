@@ -1,0 +1,40 @@
+# Конфигурация CIT Inventory
+# Скопируйте этот файл в config.toml и настройте под свои нужды
+
+[server]
+port = "8080"
+host = "localhost"
+read_timeout = "10s"
+write_timeout = "10s"
+idle_timeout = "60s"
+shutdown_timeout = "30s"
+
+[database]
+# Можно задать полный DSN
+# dsn = "postgres://user:password@localhost:5432/inventory?sslmode=disable"
+
+# Или задать компоненты отдельно
+host = "localhost"
+port = "5432"
+database = "inventory"
+user = "admin"
+password = "admin"
+sslmode = "disable"
+
+max_connections = 25
+min_connections = 5
+timeout = "30s"
+max_conn_lifetime = "1h"
+max_conn_idle_time = "30m"
+run_migrations = true
+
+[app]
+environment = "development"  # development, staging, production
+debug = false
+log_level = "info"  # debug, info, warn, error
+log_format = "terminal"  # text, terminal, json
+
+[security]
+trusted_proxies = []
+enable_cors = false
+allowed_origins = []
