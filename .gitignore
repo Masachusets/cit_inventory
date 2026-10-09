@@ -24,8 +24,9 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Configuration files (may contain secrets)
 .env
+config.toml
 
 # Editor/IDE
 # .idea/
