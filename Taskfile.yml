@@ -8,11 +8,23 @@ vars:
   BIN_DIR: bin
   SERVER_PKG: ./cmd/server
   IMPORT_PKG: ./cmd/import
+  MIGRATIONS_DIR: migrations
+  # Локация бинаря goose: сначала PATH, затем ~/go/bin
+  GOOSE:
+    sh: command -v goose >/dev/null 2>&1 && echo goose || echo $HOME/go/bin/goose
+  # DSN для goose: DATABASE_URL (приоритет, как в config.GetDSN), иначе сборка из компонентов
+  DB_DSN: '{{.DATABASE_URL | default (printf "postgres://%s:%s@%s:%s/%s?sslmode=%s" (.DB_USER | default "admin") (.DB_PASSWORD | default "admin") (.DB_HOST | default "localhost") (.DB_PORT | default "5432") (.DB_NAME | default "inventory") (.DB_SSLMODE | default "disable"))}}'
 
 # Глобальная загрузка .env: переменные попадают в окружение всех задач
 # и доступны в шаблонах как {{.VAR}} (отсутствующий файл игнорируется).
 # Благодаря этому `go-task run` видит настройки БД без ручного export.
 dotenv: ['.env']
+
+# Подключение goose к БД (для всех задач миграций).
+# DSN собирается в var DB_DSN: DATABASE_URL либо компоненты из .env.
+env:
+  GOOSE_DRIVER: postgres
+  GOOSE_DBSTRING: '{{.DB_DSN}}'
 
 tasks:
   default:
@@ -103,10 +115,11 @@ tasks:
     cmd: go mod tidy
 
   tools:
-    desc: Установка инструментов (task, golangci-lint)
+    desc: Установка инструментов (task, golangci-lint, goose)
     cmds:
       - go install github.com/go-task/task/v3/cmd/task@latest
       - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      - go install github.com/pressly/goose/v3/cmd/goose@latest
 
   env:init:
     desc: Создать .env из .env.example (если отсутствует)
@@ -153,13 +166,65 @@ tasks:
     interactive: true
     cmd: docker exec -it inventory_db psql -U {{.DB_USER | default "admin"}} -d {{.DB_NAME | default "inventory"}}
 
-  db:init:
-    desc: Инициализация схемы БД (sql/create.sql)
+  # --- Миграции (goose) ---
+  # Типовые сценарии:
+  #   go-task db:migrate:status               — статус миграций
+  #   go-task db:migrate                      — применить pending-миграции
+  #   go-task db:migrate:create -- add_column — создать файл миграции
+  #   go-task db:migrate:down                 — откатить последнюю миграцию
+  #   go-task db:migrate:validate             — проверить файлы без выполнения
+
+  db:migrate:
+    desc: Применить pending-миграции (goose up)
     preconditions:
       - sh: docker ps -q --filter "name=inventory_db" | grep -q .
         msg: 'Контейнер inventory_db не запущен — выполните go-task db:up'
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} up'
+
+  db:migrate:status:
+    desc: 'Статус миграций (goose status)'
+    preconditions:
+      - sh: docker ps -q --filter "name=inventory_db" | grep -q .
+        msg: 'Контейнер inventory_db не запущен — выполните go-task db:up'
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} status'
+
+  db:migrate:down:
+    desc: Откатить последнюю миграцию (goose down)
+    preconditions:
+      - sh: docker ps -q --filter "name=inventory_db" | grep -q .
+        msg: 'Контейнер inventory_db не запущен — выполните go-task db:up'
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} down'
+
+  db:migrate:redo:
+    desc: Перезапустить последнюю миграцию — down + up (goose redo)
+    preconditions:
+      - sh: docker ps -q --filter "name=inventory_db" | grep -q .
+        msg: 'Контейнер inventory_db не запущен — выполните go-task db:up'
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} redo'
+
+  db:migrate:reset:
+    desc: 'Откатить ВСЕ миграции (goose reset)'
+    prompt: 'Все миграции будут откачены, данные таблиц потеряны. Продолжить?'
+    preconditions:
+      - sh: docker ps -q --filter "name=inventory_db" | grep -q .
+        msg: 'Контейнер inventory_db не запущен — выполните go-task db:up'
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} reset'
+
+  db:migrate:create:
+    desc: 'Создать файл миграции (goose create): go-task db:migrate:create -- <name> [sql|go]'
+    preconditions:
+      - sh: test -n '{{.CLI_ARGS}}'
+        msg: 'Укажите имя миграции: go-task db:migrate:create -- <name> [sql|go]'
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} create {{.CLI_ARGS}}'
+
+  db:migrate:validate:
+    desc: Проверить файлы миграций без выполнения (goose validate)
+    cmd: '{{.GOOSE}} -dir {{.MIGRATIONS_DIR}} validate'
+
+  db:init:
+    desc: Инициализация схемы БД (применение миграций, см. db:migrate)
     cmds:
-      - docker exec -i inventory_db psql -U {{.DB_USER | default "admin"}} -d {{.DB_NAME | default "inventory"}} -v ON_ERROR_STOP=1 < sql/create.sql
+      - task: db:migrate
 
   db:reset:
     desc: Пересоздать БД с нуля (ВСЕ ДАННЫЕ БУДУТ УДАЛЕНЫ)

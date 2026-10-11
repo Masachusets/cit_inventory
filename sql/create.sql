@@ -116,8 +116,6 @@ CREATE TABLE equipments_assignments (
 -- ============================================================================
 -- 5. Индексы и триггеры
 -- ============================================================================
--- Быстрый поиск текущего закрепления
-CREATE UNIQUE INDEX uq_active_assignment ON equipments_assignments(equipment_id) WHERE is_active = TRUE;
 -- История перемещений
 CREATE INDEX idx_eq_assignments_history ON equipments_assignments(equipment_id, assigned_at DESC);
 
