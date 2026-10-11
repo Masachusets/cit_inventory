@@ -37,6 +37,10 @@ func Logger(log *slog.Logger) func(http.Handler) http.Handler {
 
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
+			// Пропускаем запрос через следующий обработчик,
+			// чтобы ww успел зафиксировать статус и записанные байты.
+			h.ServeHTTP(ww, r)
+
 			level := slog.LevelInfo
 			switch {
 			case ww.Status() >= 500:
