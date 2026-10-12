@@ -100,7 +100,7 @@ func TestLogger_LogsRequestAttributes(t *testing.T) {
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("payload"))
+		_, _ = w.Write([]byte("payload"))
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/items?limit=5", nil)

@@ -18,11 +18,11 @@ func NewHealthHandler(pool *pgxpool.Pool) *HealthHandler {
 
 func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Ok"))
+	_, _ = w.Write([]byte("Ok"))
 }
 
 func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2 * time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := h.pool.Ping(ctx); err != nil {
@@ -31,5 +31,5 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Ok"))
+	_, _ = w.Write([]byte("Ok"))
 }

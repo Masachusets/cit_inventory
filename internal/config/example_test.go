@@ -8,11 +8,18 @@ import (
 	"github.com/Masachusets/cit_inventory/internal/config"
 )
 
+// mustSetenv устанавливает переменную окружения, завершая пример при ошибке.
+func mustSetenv(key, value string) {
+	if err := os.Setenv(key, value); err != nil {
+		log.Fatal(err)
+	}
+}
+
 // Пример использования GetDSN() с DSN.
 // Единственный запускаемый пример: Load() вызывается один раз за прогон,
 // т.к. флаги регистрируются в глобальном flag только однократно.
 func Example_getDSNWithDSN() {
-	os.Setenv("DATABASE_URL", "postgres://user:pass@localhost:5432/mydb?sslmode=require")
+	mustSetenv("DATABASE_URL", "postgres://user:pass@localhost:5432/mydb?sslmode=require")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -43,12 +50,12 @@ func ExampleLoad() {
 // Пример использования GetDSN() с компонентами.
 // Без комментария Output - компилируется, но не выполняется.
 func Example_getDSNWithComponents() {
-	os.Setenv("DB_HOST", "localhost")
-	os.Setenv("DB_PORT", "5432")
-	os.Setenv("DB_NAME", "inventory")
-	os.Setenv("DB_USER", "admin")
-	os.Setenv("DB_PASSWORD", "secret")
-	os.Setenv("DB_SSLMODE", "disable")
+	mustSetenv("DB_HOST", "localhost")
+	mustSetenv("DB_PORT", "5432")
+	mustSetenv("DB_NAME", "inventory")
+	mustSetenv("DB_USER", "admin")
+	mustSetenv("DB_PASSWORD", "secret")
+	mustSetenv("DB_SSLMODE", "disable")
 
 	cfg, err := config.Load()
 	if err != nil {

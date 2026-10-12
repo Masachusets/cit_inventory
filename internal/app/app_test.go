@@ -113,7 +113,7 @@ func TestRun_ListenError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("net.Listen(): %v", err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 
 	port := strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 
