@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 	"time"
-	
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
-type server struct{
+type server struct {
 	Port            string        `env:"SERVER_PORT" env-default:"8080" toml:"port"`
 	Host            string        `env:"SERVER_HOST" env-default:"localhost" toml:"host"`
 	ReadTimeout     time.Duration `env:"SERVER_READ_TIMEOUT" env-default:"10s" toml:"read_timeout"`
@@ -19,10 +19,10 @@ type server struct{
 	ShutdownTimeout time.Duration `env:"SERVER_SHUTDOWN_TIMEOUT" env-default:"30s" toml:"shutdown_timeout"`
 }
 
-type database struct{
+type database struct {
 	// DSN имеет приоритет, если задан
 	DSN string `env:"DATABASE_URL" toml:"dsn"`
-	
+
 	// Компоненты для сборки DSN
 	Host     string `env:"DB_HOST" env-default:"localhost" toml:"host"`
 	Port     string `env:"DB_PORT" env-default:"5432" toml:"port"`
@@ -30,7 +30,7 @@ type database struct{
 	User     string `env:"DB_USER" env-default:"admin" toml:"user"`
 	Password string `env:"DB_PASSWORD" env-default:"admin" toml:"password"`
 	SSLMode  string `env:"DB_SSLMODE" env-default:"disable" toml:"sslmode"`
-	
+
 	MaxConnections  int32         `env:"DATABASE_MAX_CONNECTIONS" env-default:"25" toml:"max_connections"`
 	MinConnections  int32         `env:"DATABASE_MIN_CONNECTIONS" env-default:"5" toml:"min_connections"`
 	Timeout         time.Duration `env:"DATABASE_TIMEOUT" env-default:"30s" toml:"timeout"`
@@ -39,7 +39,7 @@ type database struct{
 	RunMigrations   bool          `env:"DATABASE_RUN_MIGRATIONS" env-default:"true" toml:"run_migrations"`
 }
 
-type app struct{
+type app struct {
 	Environment string `env:"APP_ENVIRONMENT" env-default:"development" toml:"environment"`
 	Debug       bool   `env:"APP_DEBUG" env-default:"false" toml:"debug"`
 	LogLevel    string `env:"APP_LOG_LEVEL" env-default:"info" toml:"log_level"`
@@ -76,10 +76,10 @@ func (d *database) GetDSN() string {
 // 4. Флаги командной строки (наивысший приоритет)
 func Load() (*Config, error) {
 	cfg := &Config{}
-	
+
 	// 1. Первый проход: извлекаем только флаг -config из os.Args
 	configPath := parseConfigFlag()
-	
+
 	// 2. Читаем TOML файл (дефолты уже в тегах)
 	if configPath != "" {
 		if err := cleanenv.ReadConfig(configPath, cfg); err != nil {
@@ -88,18 +88,18 @@ func Load() (*Config, error) {
 			}
 		}
 	}
-	
+
 	// 3. Читаем переменные окружения (перезаписывают значения из TOML)
 	if err := cleanenv.ReadEnv(cfg); err != nil {
 		return nil, fmt.Errorf("failed to read environment variables: %w", err)
 	}
-	
+
 	// 4. Второй проход: парсим остальные флаги.
 	// Дефолты флагов = текущие значения cfg (из TOML/ENV),
 	// поэтому незаданные флаги ничего не меняют,
 	// а заданные - перезаписывают (наивысший приоритет).
 	parseFlags(cfg)
-	
+
 	return cfg, nil
 }
 
@@ -135,20 +135,20 @@ func parseFlags(cfg *Config) {
 	flag.StringVar(&cfg.DB.Database, "db-name", cfg.DB.Database, "Database name")
 	flag.StringVar(&cfg.DB.User, "db-user", cfg.DB.User, "Database user")
 	flag.StringVar(&cfg.DB.Password, "db-password", cfg.DB.Password, "Database password")
-	
+
 	// Server - порт и хост
 	flag.StringVar(&cfg.Server.Port, "port", cfg.Server.Port, "HTTP server port")
 	flag.StringVar(&cfg.Server.Host, "host", cfg.Server.Host, "HTTP server host")
-	
+
 	// App - логирование и режим
 	flag.StringVar(&cfg.App.Environment, "env", cfg.App.Environment, "Environment: development, staging, production")
 	flag.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "Enable debug mode")
 	flag.StringVar(&cfg.App.LogLevel, "log-level", cfg.App.LogLevel, "Log level: debug, info, warn, error")
 	flag.StringVar(&cfg.App.LogFormat, "log-format", cfg.App.LogFormat, "Log format: text, terminal, json")
-	
+
 	// Флаг -config уже обработан в первом проходе, регистрируем повторно,
 	// чтобы flag.Parse() не выдавал ошибку о неизвестном флаге
 	flag.String("config", "config.toml", "Path to config file")
-	
+
 	flag.Parse()
 }

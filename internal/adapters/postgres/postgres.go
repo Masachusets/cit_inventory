@@ -55,7 +55,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*pgxpool
 	poolConfig.MinConns = cfg.DB.MinConnections
 	poolConfig.MaxConnLifetime = cfg.DB.MaxConnLifetime
 	poolConfig.MaxConnIdleTime = cfg.DB.MaxConnIdleTime
-	
+
 	// poolConfig.ConnConfig.Tracer = &QueryTracer{logger: logger}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
@@ -66,7 +66,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*pgxpool
 	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	if err := pool.Ping(pingCtx);err != nil {
+	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}

@@ -18,11 +18,11 @@ func SetupLogger(debug bool, logLevel string, logFormat string) *slog.Logger {
 
 	handlerOpts := &slog.HandlerOptions{
 		AddSource: true,
-		Level: level,
+		Level:     level,
 	}
 
 	var handler slog.Handler
-	if strings.ToLower(logFormat) == "json"{
+	if strings.ToLower(logFormat) == "json" {
 		handler = slog.NewJSONHandler(os.Stdout, handlerOpts)
 	} else {
 		handler = slog.NewTextHandler(os.Stdout, handlerOpts)

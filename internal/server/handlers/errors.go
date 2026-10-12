@@ -26,8 +26,8 @@ func respondJSON(w http.ResponseWriter, status int, data any) {
 
 func respondError(w http.ResponseWriter, r *http.Request, status int, message string) {
 	respondJSON(w, status, errorResponce{
-		Error: http.StatusText(status),
-		Message: message,
+		Error:     http.StatusText(status),
+		Message:   message,
 		RequestID: chimw.GetReqID(r.Context()),
 	})
 }
