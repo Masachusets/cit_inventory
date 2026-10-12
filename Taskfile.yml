@@ -45,6 +45,10 @@ tasks:
     desc: 'Импорт из Excel: номенклатурная таблица + карточки КУ Ф-111 (go-task import -- -excel=excel -ums=excel/UMS.xlsx)'
     cmd: go run {{.IMPORT_PKG}} {{.CLI_ARGS}}
 
+  departments:
+    desc: 'Заполнить departments из data/departments.txt, одноразово (go-task departments -- -file=...)'
+    cmd: go run ./cmd/departments {{.CLI_ARGS}}
+
   build:
     desc: Собрать бинарники в bin/
     cmds:

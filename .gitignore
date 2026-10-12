@@ -28,6 +28,9 @@ go.work.sum
 .env
 config.toml
 
+# Departments data (real units, may contain internal info)
+data/departments.txt
+
 # Editor/IDE
 # .idea/
 .vscode/
