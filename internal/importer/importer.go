@@ -41,12 +41,15 @@ func New(pool *pgxpool.Pool, log *slog.Logger, srcPath, umsPath string) *Importe
 	return &Importer{pool: pool, log: log, srcPath: srcPath, umsPath: umsPath}
 }
 
-// Run выполняет импорт: номенклатурная таблица → карточки учёта.
+// Run выполняет импорт: номенклатурная таблица → карточки учёта → оборудование.
 func (imp *Importer) Run(ctx context.Context) error {
 	if err := imp.runNomenclature(ctx); err != nil {
 		return err
 	}
-	return imp.runCards(ctx)
+	if err := imp.runCards(ctx); err != nil {
+		return err
+	}
+	return imp.runEquipment(ctx)
 }
 
 // runNomenclature: выбор файла → парсинг → синхронизация с БД.
@@ -132,6 +135,56 @@ func (imp *Importer) runCards(ctx context.Context) error {
 	imp.log.Info("cards import finished",
 		"imported", imported,
 		"skipped_written_off", res.WrittenOff,
+	)
+
+	return nil
+}
+
+// runEquipment: выбор UMS.xlsx → парсинг листа «Учет» → вставка в equipments
+// и equipments_assignments. Импорт одноразовый: без синхронизации, повторный
+// запуск упадёт на UNIQUE(inventory_number).
+func (imp *Importer) runEquipment(ctx context.Context) error {
+	if imp.umsPath == "" {
+		imp.log.Info("equipment import skipped: no UMS path")
+		return nil
+	}
+
+	path, err := resolveUMSFile(imp.umsPath)
+	if err != nil {
+		return fmt.Errorf("resolve UMS file: %w", err)
+	}
+	imp.log.Info("excel file selected", "kind", "equipment", "path", path)
+
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		return fmt.Errorf("open UMS file %s: %w", path, err)
+	}
+	defer f.Close() //nolint:errcheck
+
+	res, err := ParseEquipment(f)
+	if err != nil {
+		return fmt.Errorf("parse equipment: %w", err)
+	}
+	for _, w := range res.Warnings {
+		imp.log.Warn("parse warning", "sheet", w.Sheet, "row", w.Row, "message", w.Message)
+	}
+	imp.log.Info("equipment parsed", "records", len(res.Equipments), "warnings", len(res.Warnings))
+
+	stats, warnings, err := ImportEquipment(ctx, imp.pool, res.Equipments)
+	if err != nil {
+		return fmt.Errorf("import equipment: %w", err)
+	}
+	for _, w := range warnings {
+		imp.log.Warn("resolve warning", "sheet", w.Sheet, "row", w.Row, "message", w.Message)
+	}
+
+	imp.log.Info("equipment import finished",
+		"equipments", stats.Equipments,
+		"assignments", stats.Assignments,
+		"assign_employee", stats.AssignEmployee,
+		"assign_department", stats.AssignDepartment,
+		"assign_warehouse", stats.AssignWarehouse,
+		"warnings", stats.Warnings,
 	)
 
 	return nil

@@ -42,7 +42,7 @@ tasks:
       - task: run
 
   import:
-    desc: 'Импорт из Excel: номенклатурная таблица + карточки КУ Ф-111 (go-task import -- -excel=excel -ums=excel/UMS.xlsx)'
+    desc: 'Импорт из Excel: номенклатурная таблица + карточки КУ Ф-111 + оборудование Учет (go-task import -- -excel=excel -ums=excel/UMS.xlsx)'
     cmd: go run {{.IMPORT_PKG}} {{.CLI_ARGS}}
 
   departments:

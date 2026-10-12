@@ -27,7 +27,7 @@ func run() error {
 	excelPath := flag.String("excel", "excel",
 		"Путь к Excel-файлу номенклатурной таблицы или к директории с ними")
 	umsPath := flag.String("ums", "excel/UMS.xlsx",
-		"Путь к UMS.xlsx (карточки КУ Ф-111) или директория с ним; пустая строка — пропустить импорт карточек")
+		"Путь к UMS.xlsx (листы «КУ Ф-111» → cards и «Учет» → equipments) или директория с ним; пустая строка — пропустить импорт карточек и оборудования")
 
 	cfg, err := config.Load()
 	if err != nil {
