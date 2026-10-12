@@ -23,9 +23,11 @@ func main() {
 
 func run() error {
 	// Флаги импорта регистрируются до config.Load(): там вызывается flag.Parse,
-	// поэтому -excel подхватывается на общих условиях с остальными флагами.
+	// поэтому -excel/-ums подхватываются на общих условиях с остальными флагами.
 	excelPath := flag.String("excel", "excel",
 		"Путь к Excel-файлу номенклатурной таблицы или к директории с ними")
+	umsPath := flag.String("ums", "excel/UMS.xlsx",
+		"Путь к UMS.xlsx (карточки КУ Ф-111) или директория с ним; пустая строка — пропустить импорт карточек")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -48,5 +50,5 @@ func run() error {
 	}
 	defer pool.Close()
 
-	return importer.New(pool, log, *excelPath).Run(ctx)
+	return importer.New(pool, log, *excelPath, *umsPath).Run(ctx)
 }

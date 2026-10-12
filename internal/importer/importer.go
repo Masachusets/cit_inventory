@@ -23,26 +23,39 @@ type fileVersion struct {
 	Year  int
 }
 
-// Importer импортирует номенклатурную таблицу из Excel-файла в БД.
+// Importer импортирует данные из Excel-файлов в БД:
+// номенклатурную таблицу (srcPath) и карточки учёта UMS (umsPath).
 type Importer struct {
 	pool    *pgxpool.Pool
 	log     *slog.Logger
 	srcPath string
+	umsPath string
 }
 
-// New создаёт Importer. srcPath — путь к Excel-файлу либо к директории,
-// в которой автоматически выбирается файл с максимальной версией MM.YYYY.
-func New(pool *pgxpool.Pool, log *slog.Logger, srcPath string) *Importer {
-	return &Importer{pool: pool, log: log, srcPath: srcPath}
+// New создаёт Importer.
+// srcPath — путь к номенклатурной таблице (файл либо директория,
+// в которой выбирается файл с максимальной версией MM.YYYY);
+// umsPath — путь к UMS.xlsx (файл либо директория; пустая строка —
+// импорт карточек пропускается).
+func New(pool *pgxpool.Pool, log *slog.Logger, srcPath, umsPath string) *Importer {
+	return &Importer{pool: pool, log: log, srcPath: srcPath, umsPath: umsPath}
 }
 
-// Run выполняет импорт: выбор файла → парсинг → синхронизация с БД.
+// Run выполняет импорт: номенклатурная таблица → карточки учёта.
 func (imp *Importer) Run(ctx context.Context) error {
+	if err := imp.runNomenclature(ctx); err != nil {
+		return err
+	}
+	return imp.runCards(ctx)
+}
+
+// runNomenclature: выбор файла → парсинг → синхронизация с БД.
+func (imp *Importer) runNomenclature(ctx context.Context) error {
 	path, version, err := resolveFile(imp.srcPath)
 	if err != nil {
 		return fmt.Errorf("resolve excel file: %w", err)
 	}
-	imp.log.Info("excel file selected", "path", path, "version", version)
+	imp.log.Info("excel file selected", "kind", "nomenclature", "path", path, "version", version)
 
 	f, err := excelize.OpenFile(path)
 	if err != nil {
@@ -64,7 +77,7 @@ func (imp *Importer) Run(ctx context.Context) error {
 		return fmt.Errorf("sync nomenclatures: %w", err)
 	}
 
-	imp.log.Info("import finished",
+	imp.log.Info("nomenclature import finished",
 		"added", stats.Added,
 		"updated", stats.Updated,
 		"deleted", stats.Deleted,
@@ -76,6 +89,68 @@ func (imp *Importer) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// runCards: выбор UMS.xlsx → парсинг листа «КУ Ф-111» → вставка в cards.
+// Импорт одноразовый: без синхронизации, повторный запуск упадёт на UNIQUE.
+func (imp *Importer) runCards(ctx context.Context) error {
+	if imp.umsPath == "" {
+		imp.log.Info("cards import skipped: no UMS path")
+		return nil
+	}
+
+	path, err := resolveUMSFile(imp.umsPath)
+	if err != nil {
+		return fmt.Errorf("resolve UMS file: %w", err)
+	}
+	imp.log.Info("excel file selected", "kind", "cards", "path", path)
+
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		return fmt.Errorf("open UMS file %s: %w", path, err)
+	}
+	defer f.Close() //nolint:errcheck
+
+	res, err := ParseCards(f)
+	if err != nil {
+		return fmt.Errorf("parse cards: %w", err)
+	}
+	for _, w := range res.Warnings {
+		imp.log.Warn("parse warning", "sheet", w.Sheet, "row", w.Row, "message", w.Message)
+	}
+	imp.log.Info("cards parsed",
+		"records", len(res.Cards),
+		"skipped_written_off", res.WrittenOff,
+		"warnings", len(res.Warnings),
+	)
+
+	imported, err := ImportCards(ctx, imp.pool, res.Cards)
+	if err != nil {
+		return fmt.Errorf("import cards: %w", err)
+	}
+
+	imp.log.Info("cards import finished",
+		"imported", imported,
+		"skipped_written_off", res.WrittenOff,
+	)
+
+	return nil
+}
+
+// resolveUMSFile возвращает путь к UMS.xlsx: сам файл либо директорию с ним.
+func resolveUMSFile(srcPath string) (string, error) {
+	info, err := os.Stat(srcPath)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return srcPath, nil
+	}
+	path := filepath.Join(srcPath, "UMS.xlsx")
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("UMS.xlsx не найден в директории %s", srcPath)
+	}
+	return path, nil
 }
 
 // resolveFile возвращает путь к файлу и его версию.

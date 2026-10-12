@@ -105,3 +105,46 @@ func TestResolveFile(t *testing.T) {
 		}
 	})
 }
+
+func TestResolveUMSFile(t *testing.T) {
+	t.Run("указан файл напрямую", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "UMS.xlsx")
+		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := resolveUMSFile(path)
+		if err != nil {
+			t.Fatalf("resolveUMSFile(): %v", err)
+		}
+		if got != path {
+			t.Errorf("path = %q, want %q", got, path)
+		}
+	})
+
+	t.Run("директория: ищется UMS.xlsx", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "UMS.xlsx"), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := resolveUMSFile(dir)
+		if err != nil {
+			t.Fatalf("resolveUMSFile(): %v", err)
+		}
+		want := filepath.Join(dir, "UMS.xlsx")
+		if got != want {
+			t.Errorf("path = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("директория без UMS.xlsx — ошибка", func(t *testing.T) {
+		if _, err := resolveUMSFile(t.TempDir()); err == nil {
+			t.Error("resolveUMSFile() error = nil, want error")
+		}
+	})
+
+	t.Run("несуществующий путь — ошибка", func(t *testing.T) {
+		if _, err := resolveUMSFile(filepath.Join(t.TempDir(), "нет")); err == nil {
+			t.Error("resolveUMSFile() error = nil, want error")
+		}
+	})
+}
