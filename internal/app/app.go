@@ -14,6 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// defaultShutdownTimeout применяется, если в конфиге не задан Server.ShutdownTimeout.
+const defaultShutdownTimeout = 15 * time.Second
+
 type statusWriter struct {
 	http.ResponseWriter
 	status int
@@ -22,6 +25,15 @@ type statusWriter struct {
 func (w *statusWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+// shutdownTimeout возвращает таймаут graceful shutdown из конфига.
+// Если значение не задано (нулевое/отрицательное) — используется defaultShutdownTimeout.
+func shutdownTimeout(cfg *config.Config) time.Duration {
+	if cfg.Server.ShutdownTimeout > 0 {
+		return cfg.Server.ShutdownTimeout
+	}
+	return defaultShutdownTimeout
 }
 
 // runApp инициализирует и запускает HTTP-сервер StockWise.
@@ -55,11 +67,12 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger, pool *pgxpoo
 	}
 
 	// Graceful shutdown
-	log.Info("starting graceful sutdown")
+	timeout := shutdownTimeout(cfg)
+	log.Info("starting graceful shutdown", "timeout", timeout)
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(
 		context.Background(),
-		15*time.Second,
+		timeout,
 	)
 	defer shutdownCancel()
 

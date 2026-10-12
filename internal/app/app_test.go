@@ -56,6 +56,30 @@ func testRunConfig(port string) *config.Config {
 	return cfg
 }
 
+func TestShutdownTimeout(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  time.Duration
+		want time.Duration
+	}{
+		{name: "значение из конфига", cfg: 30 * time.Second, want: 30 * time.Second},
+		{name: "миллисекунды из конфига", cfg: 250 * time.Millisecond, want: 250 * time.Millisecond},
+		{name: "не задано — дефолт", cfg: 0, want: defaultShutdownTimeout},
+		{name: "отрицательное — дефолт", cfg: -time.Second, want: defaultShutdownTimeout},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := testRunConfig("0")
+			cfg.Server.ShutdownTimeout = tt.cfg
+
+			if got := shutdownTimeout(cfg); got != tt.want {
+				t.Errorf("shutdownTimeout() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // listenNotifyHandler сигнализирует через канал, когда сервер начал слушать адрес.
 type listenNotifyHandler struct {
 	slog.Handler
@@ -104,6 +128,80 @@ func TestRun_GracefulShutdown(t *testing.T) {
 		}
 	case <-time.After(20 * time.Second):
 		t.Fatal("Run() не завершился за 20s после отмены контекста")
+	}
+}
+
+// TestRun_ShutdownTimeoutFromConfig проверяет, что Run берёт таймаут
+// graceful shutdown из cfg.Server.ShutdownTimeout, а не из зашитой константы.
+func TestRun_ShutdownTimeoutFromConfig(t *testing.T) {
+	notify := &listenNotifyHandler{
+		Handler: slog.NewTextHandler(io.Discard, nil),
+		ch:      make(chan struct{}),
+	}
+	log := slog.New(notify)
+
+	// Ищем свободный порт и освобождаем его — займёт Run.
+	probe, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("net.Listen(): %v", err)
+	}
+	port := strconv.Itoa(probe.Addr().(*net.TCPAddr).Port)
+	if err := probe.Close(); err != nil {
+		t.Fatalf("probe.Close(): %v", err)
+	}
+
+	cfg := testRunConfig(port)
+	cfg.Server.ShutdownTimeout = 300 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- Run(ctx, cfg, log, nil) }()
+
+	select {
+	case <-notify.ch:
+	case err := <-errCh:
+		t.Fatalf("Run() завершился раньше запуска: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("сервер не начал слушать адрес за 10s")
+	}
+
+	// Незавершённый запрос: сервер блокируется на чтении заголовков,
+	// соединение считается активным и Shutdown ждёт до таймаута из конфига.
+	conn, err := net.Dial("tcp", "localhost:"+port)
+	if err != nil {
+		t.Fatalf("net.Dial(): %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, err := conn.Write([]byte("GET /health/live HTTP/1.1\r\n")); err != nil {
+		t.Fatalf("conn.Write(): %v", err)
+	}
+
+	// Даём серверу принять соединение и начать читать запрос.
+	time.Sleep(300 * time.Millisecond)
+
+	start := time.Now()
+	cancel()
+
+	select {
+	case err := <-errCh:
+		elapsed := time.Since(start)
+		if err == nil {
+			t.Fatal("Run() error = nil, want deadline exceeded из cfg.Server.ShutdownTimeout")
+		}
+		if !strings.Contains(err.Error(), "server shutdown") {
+			t.Errorf("err = %q, want it to contain %q", err.Error(), "server shutdown")
+		}
+		if elapsed < 100*time.Millisecond {
+			t.Errorf("shutdown занял %v — похоже, таймаут из конфига не применён", elapsed)
+		}
+		if elapsed > 3*time.Second {
+			t.Errorf("shutdown занял %v, want около %v", elapsed, cfg.Server.ShutdownTimeout)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run() не завершился за 10s после отмены контекста")
 	}
 }
 
