@@ -42,7 +42,7 @@ tasks:
       - task: run
 
   import:
-    desc: 'Импорт данных из Excel-файлов (флаги: go-task import -- -db=... -excel=...)'
+    desc: 'Импорт номенклатурной таблицы из Excel (флаги: go-task import -- -excel=excel/Номенклатурная таблица 01.2026.xlsx)'
     cmd: go run {{.IMPORT_PKG}} {{.CLI_ARGS}}
 
   build:

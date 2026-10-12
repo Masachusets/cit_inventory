@@ -4,37 +4,49 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/Masachusets/stock_wise/internal/importer"
+	"github.com/Masachusets/cit_inventory/internal/adapters/postgres"
+	"github.com/Masachusets/cit_inventory/internal/config"
+	"github.com/Masachusets/cit_inventory/internal/importer"
+	"github.com/Masachusets/cit_inventory/pkg/logger"
 )
 
 func main() {
-	dbURL := flag.String("db", "postgres://stockwise:stockwise@localhost:5432/stockwise", "PostgreSQL connection string")
-	excelDir := flag.String("excel", "excel", "Path to directory with Excel files")
-	flag.Parse()
-
-	ctx := context.Background()
-
-	pool, err := pgxpool.New(ctx, *dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to connect to database: %v\n", err)
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "import failed: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func run() error {
+	// Флаги импорта регистрируются до config.Load(): там вызывается flag.Parse,
+	// поэтому -excel подхватывается на общих условиях с остальными флагами.
+	excelPath := flag.String("excel", "excel",
+		"Путь к Excel-файлу номенклатурной таблицы или к директории с ними")
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	log := logger.SetupLogger(cfg.App.Debug, cfg.App.LogLevel, cfg.App.LogFormat)
+
+	// Остановка по Ctrl+C / SIGTERM (например, при долгом импорте).
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
+	pool, err := postgres.New(ctx, cfg, log)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "unable to ping database: %v\n", err)
-		os.Exit(1)
-	}
-
-	log.Println("Connected to PostgreSQL")
-
-	imp := importer.New(pool, *excelDir)
-	if err := imp.Run(ctx); err != nil {
-		log.Fatalf("import failed: %v", err)
-	}
+	return importer.New(pool, log, *excelPath).Run(ctx)
 }
