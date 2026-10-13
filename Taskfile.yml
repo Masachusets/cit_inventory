@@ -47,7 +47,7 @@ tasks:
 
   departments:
     desc: 'Заполнить departments из data/departments.txt, одноразово (go-task departments -- -file=...)'
-    cmd: go run ./cmd/departments {{.CLI_ARGS}}
+    cmd: go run {{.IMPORT_PKG}} departments {{.CLI_ARGS}}
 
   build:
     desc: Собрать бинарники в bin/
