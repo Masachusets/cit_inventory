@@ -158,3 +158,67 @@ func TestNewRouter_HealthHandlerPackageLinkage(t *testing.T) {
 		t.Fatal("handlers.NewHealthHandler() = nil")
 	}
 }
+
+// TestNewRouter_CardsRoutes проверяет регистрацию всех маршрутов карточек
+// под /api/v1: маршрут должен существовать (не 404) и принимать метод (не 405).
+func TestNewRouter_CardsRoutes(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	tests := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPost, "/api/v1/cards"},
+		{http.MethodGet, "/api/v1/cards"},
+		{http.MethodGet, "/api/v1/cards/inactive"},
+		{http.MethodGet, "/api/v1/cards/1"},
+		{http.MethodPatch, "/api/v1/cards/1"},
+		{http.MethodPost, "/api/v1/cards/1/deactivate"},
+		{http.MethodDelete, "/api/v1/cards/1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(""))
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			if rr.Code == http.StatusNotFound {
+				t.Errorf("маршрут %s %s не зарегистрирован (404)", tt.method, tt.path)
+			}
+			if rr.Code == http.StatusMethodNotAllowed {
+				t.Errorf("метод %s не разрешён для %s", tt.method, tt.path)
+			}
+		})
+	}
+}
+
+// TestNewRouter_CardsInactiveNotCapturedByParam защищает от рассинхрона
+// порядка маршрутов: GET /cards/inactive не должен перехватываться как
+// /cards/{number} (иначе parseNumber вернёт 400 на слове "inactive").
+func TestNewRouter_CardsInactiveNotCapturedByParam(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/inactive", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code == http.StatusBadRequest {
+		t.Errorf("статус 400: маршрут /cards/inactive перехвачен как {number} " +
+			"(сработал parseNumber вместо ListInactive)")
+	}
+}
+
+// TestNewRouter_CardsInvalidNumber проверяет валидацию номера в пути:
+// нечисловой {number} → 400, а не 500.
+func TestNewRouter_CardsInvalidNumber(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cards/abc", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400 (номер «abc» не число)", rr.Code)
+	}
+}
