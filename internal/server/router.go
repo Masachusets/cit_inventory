@@ -33,9 +33,22 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	cardSvc := service.NewCardService(cardRepo)
 	cards := handlers.NewCardHandler(cardSvc, log)
 
+	nomenclatureRepo := repository.NewNomenclatureRepo(pool)
+	nomenclatureSvc := service.NewNomenclatureService(nomenclatureRepo)
+	nomenclatures := handlers.NewNomenclatureHandler(nomenclatureSvc, log)
+
+	departmentRepo := repository.NewDepartmentRepo(pool)
+	departmentSvc := service.NewDepartmentService(departmentRepo)
+	departments := handlers.NewDepartmentHandler(departmentSvc, log)
+
+	waybillRepo := repository.NewWaybillRepo(pool)
+	waybillSvc := service.NewWaybillService(waybillRepo)
+	waybills := handlers.NewWaybillHandler(waybillSvc, log)
+
 	r.Route("/api/v1", func(r chi.Router) {
-		// Статический маршрут /cards/inactive объявлен ДО параметрического
-		// /cards/{number}, иначе chi перехватил бы "inactive" как {number}.
+		// Статические маршруты /cards/inactive и /departments/inactive объявлены
+		// ДО параметрических /{number} и /{code}, иначе chi перехватил бы
+		// "inactive" как path-параметр.
 		r.Get("/cards/inactive", cards.ListInactive)
 		r.Get("/cards", cards.List)
 		r.Post("/cards", cards.Create)
@@ -44,6 +57,22 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 		r.Patch("/cards/{number}", cards.Update)
 		r.Post("/cards/{number}/deactivate", cards.Deactivate)
 		r.Delete("/cards/{number}", cards.Delete)
+
+		r.Get("/nomenclatures", nomenclatures.List)
+		r.Get("/nomenclatures/{id}", nomenclatures.Get)
+
+		r.Get("/departments/inactive", departments.ListInactive)
+		r.Get("/departments", departments.List)
+		r.Post("/departments", departments.Create)
+
+		r.Get("/departments/{code}", departments.Get)
+		r.Patch("/departments/{code}", departments.Update)
+		r.Post("/departments/{code}/deactivate", departments.Deactivate)
+
+		r.Get("/waybills", waybills.List)
+		r.Post("/waybills", waybills.Create)
+
+		r.Get("/waybills/{id}", waybills.Get)
 	})
 
 	r.NotFound(handlers.NotFound)
