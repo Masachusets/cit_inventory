@@ -8,9 +8,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-inventory}
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
-      # Postgres должен писать данные ВНУТРИ смонтированного тома pgdata.
-      # Образ по умолчанию использует PGDATA=/var/lib/postgresql/18/docker
-      # (анонимный том), который теряется при пересоздании контейнера.
       PGDATA: /var/lib/postgresql/inventory/data
     volumes:
       - pgdata:/var/lib/postgresql/inventory/data
