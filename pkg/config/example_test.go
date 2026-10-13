@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Masachusets/cit_inventory/internal/config"
+	"github.com/Masachusets/cit_inventory/pkg/config"
 )
 
 // mustSetenv устанавливает переменную окружения, завершая пример при ошибке.

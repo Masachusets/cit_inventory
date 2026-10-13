@@ -29,17 +29,17 @@ func TestParseCommand(t *testing.T) {
 		},
 		{
 			name: "первый аргумент — флаг, импорт из Excel",
-			args: []string{"-excel=excel", "-ums="},
+			args: []string{"-excel=data/excel", "-ums="},
 			want: cmdImport,
 		},
 		{
 			name: "значение флага через пробел не считается подкомандой",
-			args: []string{"-excel", "excel"},
+			args: []string{"-excel", "data/excel"},
 			want: cmdImport,
 		},
 		{
 			name: "явная подкоманда import",
-			args: []string{cmdImport, "-ums=excel/UMS.xlsx"},
+			args: []string{cmdImport, "-ums=data/excel/UMS.xlsx"},
 			want: cmdImport,
 		},
 		{

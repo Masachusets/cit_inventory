@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masachusets/cit_inventory/internal/config"
+	"github.com/Masachusets/cit_inventory/pkg/config"
 )
 
 func TestStatusWriter_WriteHeader(t *testing.T) {

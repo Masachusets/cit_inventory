@@ -21,9 +21,9 @@ import (
 	"syscall"
 
 	"github.com/Masachusets/cit_inventory/internal/adapters/postgres"
-	"github.com/Masachusets/cit_inventory/internal/config"
-	"github.com/Masachusets/cit_inventory/internal/departments"
 	"github.com/Masachusets/cit_inventory/internal/importer"
+	"github.com/Masachusets/cit_inventory/pkg/config"
+	"github.com/Masachusets/cit_inventory/pkg/departments"
 	"github.com/Masachusets/cit_inventory/pkg/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -48,7 +48,7 @@ const usage = `Использование: import [подкоманда] [фла
 
 Примеры:
   import
-  import -excel=excel -ums=excel/UMS.xlsx
+  import -excel=data/excel -ums=data/excel/UMS.xlsx
   import departments -file=data/departments.txt
 `
 
@@ -143,9 +143,9 @@ func (c *cli) close() {
 func runImport() error {
 	// Флаги импорта регистрируются до config.Load(): там вызывается flag.Parse,
 	// поэтому -excel/-ums подхватываются на общих условиях с остальными флагами.
-	excelPath := flag.String("excel", "excel",
+	excelPath := flag.String("excel", "data/excel",
 		"Путь к Excel-файлу номенклатурной таблицы или к директории с ними")
-	umsPath := flag.String("ums", "excel/UMS.xlsx",
+	umsPath := flag.String("ums", "data/excel/UMS.xlsx",
 		"Путь к UMS.xlsx (листы «КУ Ф-111» → cards и «Учет» → equipments) или директория с ним; пустая строка — пропустить импорт карточек и оборудования")
 
 	c, err := newCLI()

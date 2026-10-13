@@ -47,7 +47,7 @@ package main
 
 import (
     "log"
-    "yourproject/internal/config"
+    "yourproject/pkg/config"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/Masachusets/cit_inventory/internal/adapters/postgres"
 	"github.com/Masachusets/cit_inventory/internal/app"
-	"github.com/Masachusets/cit_inventory/internal/config"
+	"github.com/Masachusets/cit_inventory/pkg/config"
 	"github.com/Masachusets/cit_inventory/pkg/logger"
 )
 

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Masachusets/cit_inventory/internal/config"
+	"github.com/Masachusets/cit_inventory/pkg/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
