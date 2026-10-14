@@ -147,7 +147,7 @@ func (r *DepartmentRepo) Deactivate(ctx context.Context, code int16) error {
 }
 
 // scanDepartment читает одну строку departments в доменную модель.
-func scanDepartment(row cardScanner) (*domain.Department, error) {
+func scanDepartment(row rowScanner) (*domain.Department, error) {
 	var d domain.Department
 	if err := row.Scan(&d.Code, &d.Name, &d.IsActive, &d.CreatedAt); err != nil {
 		return nil, err

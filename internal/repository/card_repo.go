@@ -182,7 +182,7 @@ func (r *CardRepo) Delete(ctx context.Context, number int) error {
 }
 
 // scanCard читает одну строку cards в доменную модель.
-func scanCard(row cardScanner) (*domain.Card, error) {
+func scanCard(row rowScanner) (*domain.Card, error) {
 	var c domain.Card
 	var deletedAt *time.Time
 	if err := row.Scan(

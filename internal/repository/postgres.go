@@ -11,7 +11,7 @@ const pgUniqueViolation = "23505"
 // (ON DELETE RESTRICT): на карточку ссылается оборудование.
 const pgForeignKeyViolation = "23503"
 
-// cardScanner — то, что умеют и *pgx.Row, и pgx.Rows.
-type cardScanner interface {
+// rowScanner — то, что умеют и *pgx.Row, и pgx.Rows.
+type rowScanner interface {
 	Scan(dest ...any) error
 }

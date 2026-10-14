@@ -118,7 +118,7 @@ func (r *WaybillRepo) ExistsByNumber(ctx context.Context, number string) (bool, 
 }
 
 // scanWaybill читает одну строку waybills в доменную модель.
-func scanWaybill(row cardScanner) (*domain.Waybill, error) {
+func scanWaybill(row rowScanner) (*domain.Waybill, error) {
 	var wb domain.Waybill
 	var number *string
 	var issueDate *time.Time
