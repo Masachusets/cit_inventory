@@ -45,6 +45,10 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	waybillSvc := service.NewWaybillService(waybillRepo)
 	waybills := handlers.NewWaybillHandler(waybillSvc, log)
 
+	equipmentRepo := repository.NewEquipmentRepo(pool)
+	equipmentSvc := service.NewEquipmentService(equipmentRepo)
+	equipments := handlers.NewEquipmentHandler(equipmentSvc, log)
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// Статические маршруты /cards/inactive и /departments/inactive объявлены
 		// ДО параметрических /{number} и /{code}, иначе chi перехватил бы
@@ -73,6 +77,22 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 		r.Post("/waybills", waybills.Create)
 
 		r.Get("/waybills/{id}", waybills.Get)
+
+		// Оборудование. Статические маршруты /equipments/inactive и
+		// /equipments/inventory/{inventory_number} объявлены ДО параметрических
+		// /equipments/{id}, иначе chi перехватил бы «inactive»/«inventory»
+		// как path-параметр.
+		r.Get("/equipments/inactive", equipments.ListInactive)
+		r.Get("/equipments/inventory/{inventory_number}", equipments.GetByInventoryNumber)
+		r.Patch("/equipments/inventory/{inventory_number}", equipments.UpdateByInventoryNumber)
+		r.Delete("/equipments/inventory/{inventory_number}", equipments.DeleteByInventoryNumber)
+
+		r.Get("/equipments", equipments.List)
+		r.Post("/equipments", equipments.Create)
+
+		r.Get("/equipments/{id}", equipments.GetByID)
+		r.Patch("/equipments/{id}", equipments.UpdateByID)
+		r.Delete("/equipments/{id}", equipments.DeleteByID)
 	})
 
 	r.NotFound(handlers.NotFound)
