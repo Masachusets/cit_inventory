@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,26 +42,51 @@ func (f *fakeCardRepo) GetByNumber(_ context.Context, number int) (*domain.Card,
 	return &cp, nil
 }
 
-func (f *fakeCardRepo) ListActive(_ context.Context) ([]*domain.Card, error) {
-	var out []*domain.Card
-	for _, c := range f.cards {
-		if c.IsActive {
-			cp := *c
-			out = append(out, &cp)
-		}
-	}
-	return out, nil
+func (f *fakeCardRepo) ListActive(_ context.Context, filter domain.CardFilter) ([]*domain.Card, error) {
+	return f.list(true, filter), nil
 }
 
-func (f *fakeCardRepo) ListInactive(_ context.Context) ([]*domain.Card, error) {
+func (f *fakeCardRepo) ListInactive(_ context.Context, filter domain.CardFilter) ([]*domain.Card, error) {
+	return f.list(false, filter), nil
+}
+
+// list имитирует выборку с фильтром: ILIKE '%...%' по full_name и диапазоны
+// дат created_at/updated_at/deleted_at (>= от, <= до) по дню.
+func (f *fakeCardRepo) list(active bool, filter domain.CardFilter) []*domain.Card {
 	var out []*domain.Card
 	for _, c := range f.cards {
-		if !c.IsActive {
-			cp := *c
-			out = append(out, &cp)
+		if c.IsActive != active {
+			continue
 		}
+		if filter.FullName != nil && !strings.Contains(strings.ToLower(c.FullName), strings.ToLower(*filter.FullName)) {
+			continue
+		}
+		if !inRange(c.CreatedAt, filter.CreatedAtFrom, filter.CreatedAtTo) {
+			continue
+		}
+		if !inRange(c.UpdatedAt, filter.UpdatedAtFrom, filter.UpdatedAtTo) {
+			continue
+		}
+		if c.DeletedAt != nil && !inRange(*c.DeletedAt, filter.DeletedAtFrom, filter.DeletedAtTo) {
+			continue
+		}
+		cp := *c
+		out = append(out, &cp)
 	}
-	return out, nil
+	return out
+}
+
+// inRange сообщает, попадает ли момент времени в дневной диапазон [from; to].
+// nil-границы означают отсутствие ограничения с соответствующей стороны.
+func inRange(t time.Time, from, to *time.Time) bool {
+	day := t.Truncate(24 * time.Hour)
+	if from != nil && day.Before(from.Truncate(24*time.Hour)) {
+		return false
+	}
+	if to != nil && day.After(to.Truncate(24*time.Hour)) {
+		return false
+	}
+	return true
 }
 
 func (f *fakeCardRepo) Exists(_ context.Context, number int) (bool, error) {
@@ -151,14 +177,60 @@ func TestService_List_SplitByStatus(t *testing.T) {
 	inactive, _ := svc.Create(context.Background(), 2, "Неактивный")
 	_, _ = svc.Deactivate(context.Background(), 2)
 
-	actives, _ := svc.ListActive(context.Background())
+	actives, _ := svc.ListActive(context.Background(), domain.CardFilter{})
 	if len(actives) != 1 || actives[0].Number != active.Number {
 		t.Errorf("ListActive = %+v, want только номер 1", actives)
 	}
 
-	inactives, _ := svc.ListInactive(context.Background())
+	inactives, _ := svc.ListInactive(context.Background(), domain.CardFilter{})
 	if len(inactives) != 1 || inactives[0].Number != inactive.Number {
 		t.Errorf("ListInactive = %+v, want только номер 2", inactives)
+	}
+}
+
+func TestService_List_Filter(t *testing.T) {
+	svc := NewCardService(newFakeCardRepo())
+	_, _ = svc.Create(context.Background(), 1, "Иванов Иван")
+	_, _ = svc.Create(context.Background(), 2, "Петров Пётр")
+	_, _ = svc.Create(context.Background(), 3, "Иванова Мария")
+
+	name := "иванов"
+	items, err := svc.ListActive(context.Background(), domain.CardFilter{FullName: &name})
+	if err != nil {
+		t.Fatalf("List() ошибка: %v", err)
+	}
+	// Подстрока «иванов» без учёта регистра матчит «Иванов Иван» и «Иванова Мария».
+	if len(items) != 2 {
+		t.Errorf("фильтр по full_name: получено %d, want 2 (%+v)", len(items), items)
+	}
+}
+
+func TestService_List_FilterCreatedAtRange(t *testing.T) {
+	repo := newFakeCardRepo()
+	// Карточки с управляемыми метками created_at.
+	mk := func(number int, name string, created time.Time) {
+		repo.cards[number] = &domain.Card{Number: number, FullName: name, IsActive: true, CreatedAt: created}
+	}
+	early := time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)
+	mid := time.Date(2023, 6, 15, 12, 0, 0, 0, time.UTC)
+	late := time.Date(2026, 12, 31, 12, 0, 0, 0, time.UTC)
+	mk(1, "Ранняя", early)
+	mk(2, "Средняя", mid)
+	mk(3, "Поздняя", late)
+
+	svc := NewCardService(repo)
+	from := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	items, err := svc.ListActive(context.Background(), domain.CardFilter{CreatedAtFrom: &from, CreatedAtTo: &to})
+	if err != nil {
+		t.Fatalf("List() ошибка: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("диапазон created_at: получено %d, want 2 (%+v)", len(items), items)
+	}
+	got := map[int]bool{items[0].Number: true, items[1].Number: true}
+	if !got[2] || !got[3] {
+		t.Errorf("диапазон created_at: номера %v, want {2, 3}", got)
 	}
 }
 

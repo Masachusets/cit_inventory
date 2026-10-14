@@ -97,8 +97,15 @@ func (h *CardHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // List обрабатывает GET /api/v1/cards — только активные карточки.
+// Поддерживает фильтры по query: full_name и диапазоны дат
+// created_at/updated_at (from/to в формате YYYY-MM-DD). Фильтр deleted_at
+// недоступен (у активных карточек deleted_at = NULL) — см. ListInactive.
 func (h *CardHandler) List(w http.ResponseWriter, r *http.Request) {
-	cards, err := h.svc.ListActive(r.Context())
+	filter, ok := parseCardFilter(w, r, false)
+	if !ok {
+		return
+	}
+	cards, err := h.svc.ListActive(r.Context(), filter)
 	if err != nil {
 		h.respondDomainError(w, r, err)
 		return
@@ -107,13 +114,91 @@ func (h *CardHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListInactive обрабатывает GET /api/v1/cards/inactive — только неактивные.
+// Поддерживает фильтры full_name, диапазоны created_at/updated_at и, кроме
+// того, диапазон deleted_at (доступен только на этом маршруте).
 func (h *CardHandler) ListInactive(w http.ResponseWriter, r *http.Request) {
-	cards, err := h.svc.ListInactive(r.Context())
+	filter, ok := parseCardFilter(w, r, true)
+	if !ok {
+		return
+	}
+	cards, err := h.svc.ListInactive(r.Context(), filter)
 	if err != nil {
 		h.respondDomainError(w, r, err)
 		return
 	}
 	respondJSON(w, http.StatusOK, toCardResponses(cards))
+}
+
+// parseCardFilter извлекает фильтр из query-параметров
+// ?full_name=...&created_at_from=YYYY-MM-DD&created_at_to=YYYY-MM-DD
+// &updated_at_from=...&updated_at_to=...
+// Диапазоны deleted_at_from/deleted_at_to разбираются только при
+// includeDeletedAt=true (маршрут /cards/inactive): у активных карточек
+// deleted_at всегда NULL, поэтому на /cards такие параметры отсекаются как 400.
+// Пустые или отсутствующие параметры не фильтруют соответствующее поле;
+// некорректная дата или from > to — 400.
+func parseCardFilter(w http.ResponseWriter, r *http.Request, includeDeletedAt bool) (domain.CardFilter, bool) {
+	var f domain.CardFilter
+	q := r.URL.Query()
+	if v := q.Get("full_name"); v != "" {
+		f.FullName = &v
+	}
+
+	from, ok := parseDateParam(w, r, "created_at_from")
+	if !ok {
+		return f, false
+	}
+	f.CreatedAtFrom = from
+	to, ok := parseDateParam(w, r, "created_at_to")
+	if !ok {
+		return f, false
+	}
+	f.CreatedAtTo = to
+	if from != nil && to != nil && from.After(*to) {
+		respondError(w, r, http.StatusBadRequest, "created_at_from must not be after created_at_to")
+		return f, false
+	}
+
+	from, ok = parseDateParam(w, r, "updated_at_from")
+	if !ok {
+		return f, false
+	}
+	f.UpdatedAtFrom = from
+	to, ok = parseDateParam(w, r, "updated_at_to")
+	if !ok {
+		return f, false
+	}
+	f.UpdatedAtTo = to
+	if from != nil && to != nil && from.After(*to) {
+		respondError(w, r, http.StatusBadRequest, "updated_at_from must not be after updated_at_to")
+		return f, false
+	}
+
+	if !includeDeletedAt {
+		if q.Has("deleted_at_from") || q.Has("deleted_at_to") {
+			respondError(w, r, http.StatusBadRequest,
+				"deleted_at filter is only supported on /cards/inactive")
+			return f, false
+		}
+		return f, true
+	}
+
+	from, ok = parseDateParam(w, r, "deleted_at_from")
+	if !ok {
+		return f, false
+	}
+	f.DeletedAtFrom = from
+	to, ok = parseDateParam(w, r, "deleted_at_to")
+	if !ok {
+		return f, false
+	}
+	f.DeletedAtTo = to
+	if from != nil && to != nil && from.After(*to) {
+		respondError(w, r, http.StatusBadRequest, "deleted_at_from must not be after deleted_at_to")
+		return f, false
+	}
+
+	return f, true
 }
 
 // Get обрабатывает GET /api/v1/cards/{number} — карточка в любом статусе.

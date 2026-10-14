@@ -16,10 +16,10 @@ type CardService interface {
 	Create(ctx context.Context, number int, fullName string) (*domain.Card, error)
 	// Get возвращает карточку по номеру в любом статусе либо domain.ErrNotFound.
 	Get(ctx context.Context, number int) (*domain.Card, error)
-	// ListActive возвращает список активных карточек.
-	ListActive(ctx context.Context) ([]*domain.Card, error)
-	// ListInactive возвращает список неактивных карточек.
-	ListInactive(ctx context.Context) ([]*domain.Card, error)
+	// ListActive возвращает список активных карточек с учётом фильтра.
+	ListActive(ctx context.Context, filter domain.CardFilter) ([]*domain.Card, error)
+	// ListInactive возвращает список неактивных карточек с учётом фильтра.
+	ListInactive(ctx context.Context, filter domain.CardFilter) ([]*domain.Card, error)
 	// UpdateName изменяет только ФИО карточки (в любом статусе).
 	UpdateName(ctx context.Context, number int, fullName string) (*domain.Card, error)
 	// Deactivate помечает карточку неактивной (идемпотентно).
@@ -66,12 +66,12 @@ func (s *CardServiceImpl) Get(ctx context.Context, number int) (*domain.Card, er
 	return s.repo.GetByNumber(ctx, number)
 }
 
-func (s *CardServiceImpl) ListActive(ctx context.Context) ([]*domain.Card, error) {
-	return s.repo.ListActive(ctx)
+func (s *CardServiceImpl) ListActive(ctx context.Context, filter domain.CardFilter) ([]*domain.Card, error) {
+	return s.repo.ListActive(ctx, filter)
 }
 
-func (s *CardServiceImpl) ListInactive(ctx context.Context) ([]*domain.Card, error) {
-	return s.repo.ListInactive(ctx)
+func (s *CardServiceImpl) ListInactive(ctx context.Context, filter domain.CardFilter) ([]*domain.Card, error) {
+	return s.repo.ListInactive(ctx, filter)
 }
 
 func (s *CardServiceImpl) UpdateName(ctx context.Context, number int, fullName string) (*domain.Card, error) {

@@ -128,3 +128,12 @@ func TestCard_Deactivate_Idempotent(t *testing.T) {
 		t.Error("UpdatedAt изменился при повторной деактивации")
 	}
 }
+
+func TestCardFilter_ZeroValue(t *testing.T) {
+	var f CardFilter
+	if f.FullName != nil || f.CreatedAtFrom != nil || f.CreatedAtTo != nil ||
+		f.UpdatedAtFrom != nil || f.UpdatedAtTo != nil ||
+		f.DeletedAtFrom != nil || f.DeletedAtTo != nil {
+		t.Errorf("нулевой фильтр должен иметь nil-поля: %+v", f)
+	}
+}

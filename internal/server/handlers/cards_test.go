@@ -35,6 +35,7 @@ type stubCardService struct {
 	lastCreateName   string
 	lastUpdateNumber int
 	lastUpdateName   string
+	lastFilter       domain.CardFilter
 }
 
 func (s *stubCardService) Create(_ context.Context, number int, fullName string) (*domain.Card, error) {
@@ -47,11 +48,13 @@ func (s *stubCardService) Get(_ context.Context, _ int) (*domain.Card, error) {
 	return s.getResult, s.getErr
 }
 
-func (s *stubCardService) ListActive(_ context.Context) ([]*domain.Card, error) {
+func (s *stubCardService) ListActive(_ context.Context, filter domain.CardFilter) ([]*domain.Card, error) {
+	s.lastFilter = filter
 	return s.listActive, s.listErr
 }
 
-func (s *stubCardService) ListInactive(_ context.Context) ([]*domain.Card, error) {
+func (s *stubCardService) ListInactive(_ context.Context, filter domain.CardFilter) ([]*domain.Card, error) {
+	s.lastFilter = filter
 	return s.listInactive, s.listErr
 }
 
@@ -150,6 +153,140 @@ func TestCardHandler_List(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Number != 42 {
 		t.Errorf("список = %+v", got)
+	}
+}
+
+func TestCardHandler_List_FilterFromQuery(t *testing.T) {
+	stub := &stubCardService{}
+	h := NewCardHandler(stub, discardLogger())
+
+	// На /cards доступны full_name и диапазоны created_at/updated_at.
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/v1/cards?full_name=иван&created_at_from=2026-10-01&created_at_to=2026-10-31"+
+			"&updated_at_from=2026-01-01&updated_at_to=2026-12-31", nil)
+	rr := httptest.NewRecorder()
+
+	h.List(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rr.Code)
+	}
+	f := stub.lastFilter
+	if f.FullName == nil || *f.FullName != "иван" {
+		t.Errorf("filter.FullName = %v", f.FullName)
+	}
+	if f.CreatedAtFrom == nil || f.CreatedAtFrom.Format("2006-01-02") != "2026-10-01" {
+		t.Errorf("filter.CreatedAtFrom = %v, want 2026-10-01", f.CreatedAtFrom)
+	}
+	if f.CreatedAtTo == nil || f.CreatedAtTo.Format("2006-01-02") != "2026-10-31" {
+		t.Errorf("filter.CreatedAtTo = %v, want 2026-10-31", f.CreatedAtTo)
+	}
+	if f.UpdatedAtFrom == nil || f.UpdatedAtFrom.Format("2006-01-02") != "2026-01-01" {
+		t.Errorf("filter.UpdatedAtFrom = %v, want 2026-01-01", f.UpdatedAtFrom)
+	}
+	if f.UpdatedAtTo == nil || f.UpdatedAtTo.Format("2006-01-02") != "2026-12-31" {
+		t.Errorf("filter.UpdatedAtTo = %v, want 2026-12-31", f.UpdatedAtTo)
+	}
+	// Фильтр deleted_at на /cards не разбирается — поля остаются nil.
+	if f.DeletedAtFrom != nil || f.DeletedAtTo != nil {
+		t.Errorf("filter.DeletedAtFrom/To = %v/%v, want nil на /cards", f.DeletedAtFrom, f.DeletedAtTo)
+	}
+}
+
+// TestCardHandler_List_DeletedAtRejected проверяет, что на /cards параметры
+// deleted_at_* отсекаются как 400: у активных карточек deleted_at всегда NULL,
+// фильтр по нему доступен только на /cards/inactive.
+func TestCardHandler_List_DeletedAtRejected(t *testing.T) {
+	h := NewCardHandler(&stubCardService{}, discardLogger())
+
+	for _, q := range []string{
+		"?deleted_at_from=2026-01-01",
+		"?deleted_at_to=2026-12-31",
+		"?deleted_at_from=2026-01-01&deleted_at_to=2026-12-31",
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/cards"+q, nil)
+		rr := httptest.NewRecorder()
+
+		h.List(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", q, rr.Code)
+		}
+	}
+}
+
+func TestCardHandler_List_InvalidDate(t *testing.T) {
+	h := NewCardHandler(&stubCardService{}, discardLogger())
+
+	for _, q := range []string{
+		"?created_at_from=13.10.2026",
+		"?updated_at_to=not-a-date",
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/cards"+q, nil)
+		rr := httptest.NewRecorder()
+
+		h.List(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", q, rr.Code)
+		}
+	}
+}
+
+func TestCardHandler_List_FromAfterTo(t *testing.T) {
+	h := NewCardHandler(&stubCardService{}, discardLogger())
+
+	for _, q := range []string{
+		"?created_at_from=2026-10-31&created_at_to=2026-10-01",
+		"?updated_at_from=2026-12-31&updated_at_to=2026-01-01",
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/cards"+q, nil)
+		rr := httptest.NewRecorder()
+
+		h.List(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", q, rr.Code)
+		}
+	}
+}
+
+func TestCardHandler_ListInactive_FilterFromQuery(t *testing.T) {
+	stub := &stubCardService{}
+	h := NewCardHandler(stub, discardLogger())
+
+	// На /cards/inactive доступен и фильтр deleted_at.
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/v1/cards/inactive?full_name=петр&deleted_at_from=2026-01-01&deleted_at_to=2026-12-31", nil)
+	rr := httptest.NewRecorder()
+
+	h.ListInactive(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rr.Code)
+	}
+	if stub.lastFilter.FullName == nil || *stub.lastFilter.FullName != "петр" {
+		t.Errorf("filter.FullName = %v", stub.lastFilter.FullName)
+	}
+	if stub.lastFilter.DeletedAtFrom == nil || stub.lastFilter.DeletedAtFrom.Format("2006-01-02") != "2026-01-01" {
+		t.Errorf("filter.DeletedAtFrom = %v, want 2026-01-01", stub.lastFilter.DeletedAtFrom)
+	}
+	if stub.lastFilter.DeletedAtTo == nil || stub.lastFilter.DeletedAtTo.Format("2006-01-02") != "2026-12-31" {
+		t.Errorf("filter.DeletedAtTo = %v, want 2026-12-31", stub.lastFilter.DeletedAtTo)
+	}
+}
+
+func TestCardHandler_ListInactive_DeletedAtFromAfterTo(t *testing.T) {
+	h := NewCardHandler(&stubCardService{}, discardLogger())
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/v1/cards/inactive?deleted_at_from=2026-12-31&deleted_at_to=2026-01-01", nil)
+	rr := httptest.NewRecorder()
+
+	h.ListInactive(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rr.Code)
 	}
 }
 

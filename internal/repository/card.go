@@ -14,10 +14,10 @@ type CardRepository interface {
 	// GetByNumber возвращает карточку по номеру в любом статусе
 	// (активную и неактивную) либо domain.ErrNotFound.
 	GetByNumber(ctx context.Context, number int) (*domain.Card, error)
-	// ListActive возвращает только активные карточки.
-	ListActive(ctx context.Context) ([]*domain.Card, error)
-	// ListInactive возвращает только неактивные карточки.
-	ListInactive(ctx context.Context) ([]*domain.Card, error)
+	// ListActive возвращает только активные карточки с учётом фильтра.
+	ListActive(ctx context.Context, filter domain.CardFilter) ([]*domain.Card, error)
+	// ListInactive возвращает только неактивные карточки с учётом фильтра.
+	ListInactive(ctx context.Context, filter domain.CardFilter) ([]*domain.Card, error)
 	// Exists сообщает, есть ли карточка с таким номером (в любом статусе).
 	Exists(ctx context.Context, number int) (bool, error)
 	// UpdateFullName обновляет ФИО и метку updated_at.

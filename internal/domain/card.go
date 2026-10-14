@@ -115,3 +115,20 @@ func validateName(fullName string) error {
 func normalizeName(fullName string) string {
 	return strings.Join(strings.Fields(fullName), " ")
 }
+
+// CardFilter — параметры фильтрации списка карточек. nil-поле означает
+// «не фильтровать по полю». full_name матчится частично без учёта регистра
+// (ILIKE '%...%'). Диапазоны дат (created_at/updated_at/deleted_at)
+// включительные по дню: границы задаются как полночь UTC дня (YYYY-MM-DD),
+// сравнение идёт по дате (колонка TIMESTAMPTZ приводится к date), поэтому
+// весь день «до» попадает в выборку. Активные карточки имеют deleted_at=NULL
+// и при заданной границе deleted_at в выборку не попадают (SQL-сравнение с NULL).
+type CardFilter struct {
+	FullName      *string    // подстрока ФИО (ILIKE '%...%')
+	CreatedAtFrom *time.Time // created_at >= от (включительно, начало дня)
+	CreatedAtTo   *time.Time // created_at <= до (включительно, весь день)
+	UpdatedAtFrom *time.Time // updated_at >= от (включительно, начало дня)
+	UpdatedAtTo   *time.Time // updated_at <= до (включительно, весь день)
+	DeletedAtFrom *time.Time // deleted_at >= от (включительно, начало дня)
+	DeletedAtTo   *time.Time // deleted_at <= до (включительно, весь день)
+}
