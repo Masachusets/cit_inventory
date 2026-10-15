@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
@@ -85,12 +86,29 @@ func discardEquipmentLogger() *slog.Logger {
 	return slog.New(slog.DiscardHandler)
 }
 
-// activeEquipment — активное оборудование для тестов.
+// activeEquipment — активное оборудование для тестов с полными данными
+// номенклатуры и закрепления: nomenclature {code, name}, текущее закрепление
+// {cardnumber, cardname} или {department code, name}.
 func activeEquipment() *domain.Equipment {
 	eq, _ := domain.NewEquipment(domain.EquipmentInput{InventoryNumber: "ИТ00042"})
 	eq.ID = 1
+	eq.NomenclatureCode = strPtr("08.01.02.00.00/0041")
+	eq.NomenclatureName = strPtr("Ноутбук Clevo 15")
+	eq.CardNumber = intPtr(101)
+	eq.CardFullName = strPtr("Иванов Иван Иванович")
+	eq.DepartmentCode = int16Ptr(100)
+	eq.DepartmentName = strPtr("опк Гомель")
 	return eq
 }
+
+// strPtr — локальный хелпер указателя на строку.
+func strPtr(v string) *string { return &v }
+
+// intPtr — локальный хелпер указателя на int.
+func intPtr(v int) *int { return &v }
+
+// int16Ptr — локальный хелпер указателя на int16.
+func int16Ptr(v int16) *int16 { return &v }
 
 // reqWithEquipmentParam внедряет chi route context с указанным path-параметром
 // (при прямом вызове хендлера URLParam() пуст).
@@ -114,7 +132,7 @@ func TestEquipmentHandler_Create(t *testing.T) {
 	h.Create(rr, req)
 
 	if rr.Code != http.StatusCreated {
-		t.Errorf("status = %d, want 201 (тело: %s)", rr.Code, rr.Body)
+		t.Fatalf("status = %d, want 201 (тело: %s)", rr.Code, rr.Body)
 	}
 	if stub.lastInput.InventoryNumber != "ИТ00042" || stub.lastInput.Status != "broken" {
 		t.Errorf("input = %+v", stub.lastInput)
@@ -289,7 +307,9 @@ func TestEquipmentHandler_List(t *testing.T) {
 	stub := &stubEquipmentService{listActive: []*domain.Equipment{activeEquipment()}}
 	h := NewEquipmentHandler(stub, discardEquipmentLogger())
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/equipments?inventory_number=ИТ0004&status=exp&location=каб", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/equipments?inventory_number=ИТ0004&status=exp&location=каб"+
+		"&nomenclature_code=08.01.02.00.00/0041&nomenclature_name=Ноутбук&card_number=101&card_full_name=Иванов"+
+		"&department_name=опк%20Гомель", nil)
 	rr := httptest.NewRecorder()
 	h.List(rr, req)
 
@@ -304,6 +324,25 @@ func TestEquipmentHandler_List(t *testing.T) {
 	}
 	if stub.lastFilter.Location == nil || *stub.lastFilter.Location != "каб" {
 		t.Errorf("filter.Location = %v", stub.lastFilter.Location)
+	}
+	// Новые фильтры.
+	if stub.lastFilter.NomenclatureCode == nil || *stub.lastFilter.NomenclatureCode != "08.01.02.00.00/0041" {
+		t.Errorf("filter.NomenclatureCode = %v", stub.lastFilter.NomenclatureCode)
+	}
+	if stub.lastFilter.NomenclatureName == nil || *stub.lastFilter.NomenclatureName != "Ноутбук" {
+		t.Errorf("filter.NomenclatureName = %v", stub.lastFilter.NomenclatureName)
+	}
+	if stub.lastFilter.CardNumber == nil || *stub.lastFilter.CardNumber != 101 {
+		t.Errorf("filter.CardNumber = %v", stub.lastFilter.CardNumber)
+	}
+	if stub.lastFilter.CardFullName == nil || *stub.lastFilter.CardFullName != "Иванов" {
+		t.Errorf("filter.CardFullName = %v", stub.lastFilter.CardFullName)
+	}
+	if stub.lastFilter.DepartmentCode != nil {
+		t.Errorf("filter.DepartmentCode = %v, want nil", stub.lastFilter.DepartmentCode)
+	}
+	if stub.lastFilter.DepartmentName == nil || *stub.lastFilter.DepartmentName != "опк Гомель" {
+		t.Errorf("filter.DepartmentName = %v", stub.lastFilter.DepartmentName)
 	}
 }
 
@@ -329,5 +368,110 @@ func TestEquipmentHandler_ListInactive(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rr.Code)
+	}
+}
+
+func TestEquipmentHandler_List_ReturnsNomenclatureAndAssignment(t *testing.T) {
+	eq := activeEquipment()
+	stub := &stubEquipmentService{listActive: []*domain.Equipment{eq}}
+	h := NewEquipmentHandler(stub, discardEquipmentLogger())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/equipments", nil)
+	rr := httptest.NewRecorder()
+	h.List(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		`"nomenclature":`,
+		`"code":"08.01.02.00.00/0041"`,
+		`"name":"Ноутбук Clevo 15"`,
+		`"assignment":`,
+		`"number":101`,
+		`"full_name":"Иванов Иван Иванович"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("тело ответа не содержит %q\nтело = %s", want, body)
+		}
+	}
+}
+
+func TestEquipmentHandler_List_Filters(t *testing.T) {
+	trips := []struct {
+		name  string
+		query string
+		check func(t *testing.T, f domain.EquipmentFilter)
+	}{
+		{"nomenclature_code", "nomenclature_code=08.01.02.00.00/0041", func(t *testing.T, f domain.EquipmentFilter) {
+			if f.NomenclatureCode == nil || *f.NomenclatureCode != "08.01.02.00.00/0041" {
+				t.Errorf("NomenclatureCode = %v", f.NomenclatureCode)
+			}
+		}},
+		{"nomenclature_name", "nomenclature_name=Clevo", func(t *testing.T, f domain.EquipmentFilter) {
+			if f.NomenclatureName == nil || *f.NomenclatureName != "Clevo" {
+				t.Errorf("NomenclatureName = %v", f.NomenclatureName)
+			}
+		}},
+		{"card_number", "card_number=101", func(t *testing.T, f domain.EquipmentFilter) {
+			if f.CardNumber == nil || *f.CardNumber != 101 {
+				t.Errorf("CardNumber = %v", f.CardNumber)
+			}
+		}},
+		{"card_full_name", "card_full_name=Иванов", func(t *testing.T, f domain.EquipmentFilter) {
+			if f.CardFullName == nil || *f.CardFullName != "Иванов" {
+				t.Errorf("CardFullName = %v", f.CardFullName)
+			}
+		}},
+		{"department_code", "department_code=100", func(t *testing.T, f domain.EquipmentFilter) {
+			if f.DepartmentCode == nil || *f.DepartmentCode != int16(100) {
+				t.Errorf("DepartmentCode = %v", f.DepartmentCode)
+			}
+		}},
+		{"department_name", "department_name=Гомель", func(t *testing.T, f domain.EquipmentFilter) {
+			if f.DepartmentName == nil || *f.DepartmentName != "Гомель" {
+				t.Errorf("DepartmentName = %v", f.DepartmentName)
+			}
+		}},
+	}
+	for _, trip := range trips {
+		t.Run(trip.name, func(t *testing.T) {
+			stub := &stubEquipmentService{listActive: []*domain.Equipment{activeEquipment()}}
+			h := NewEquipmentHandler(stub, discardEquipmentLogger())
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/equipments?"+trip.query, nil)
+			rr := httptest.NewRecorder()
+			h.List(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200 (тело: %s)", rr.Code, rr.Body.String())
+			}
+			trip.check(t, stub.lastFilter)
+		})
+	}
+}
+
+func TestEquipmentHandler_List_InvalidParams(t *testing.T) {
+	cases := []struct {
+		name string
+		url  string
+	}{
+		{"мусор в status", "/api/v1/equipments?status=нет"},
+		{"мусор в card_number", "/api/v1/equipments?card_number=abc"},
+		{"нулевой в department_code", "/api/v1/equipments?department_code=0"},
+		{"больше SMALLINT в department_code", "/api/v1/equipments?department_code=32768"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			h := NewEquipmentHandler(&stubEquipmentService{}, discardEquipmentLogger())
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+			rr := httptest.NewRecorder()
+			h.List(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400", rr.Code)
+			}
+		})
 	}
 }

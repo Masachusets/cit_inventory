@@ -15,10 +15,10 @@ import (
 
 // Лимиты колонок equipments (VARCHAR-ограничения схемы).
 const (
-	maxSerialNumberLen = 100 // serial_number VARCHAR(100)
-	maxModelNameLen    = 255 // model_name VARCHAR(255)
-	maxFormNumberLen   = 10  // form_number VARCHAR(10)
-	maxLocationLen     = 255 // location VARCHAR(255)
+	tMaxSerialNumberLen = 100 // serial_number VARCHAR(100)
+	tMaxModelNameLen    = 255 // model_name VARCHAR(255)
+	tMaxFormNumberLen   = 10  // form_number VARCHAR(10)
+	tMaxLocationLen     = 255 // location VARCHAR(255)
 )
 
 // inventoryNumberPattern — формат инвентарного номера из CHECK-ограничения
@@ -84,18 +84,28 @@ type Equipment struct {
 	ModelName       *string         // модель
 	ManufactureDate *time.Time      // год и месяц изготовления (DATE)
 	ArrivalDate     *time.Time      // дата прибытия (DATE)
-	Status          EquipmentStatus // состояние (enum, NOT NULL DEFAULT 'exp')
+	Status          EquipmentStatus // состояние (enum, NOT NULL DEFAULT exp)
 	FormNumber      *string         // № формуляра
 	Location        *string         // № кабинета / место установки
 	Notes           *string         // примечания (TEXT)
 	CreatedAt       time.Time       // техническая метка создания
 	UpdatedAt       time.Time       // техническая метка изменения
 	DeletedAt       *time.Time      // метка удаления (soft delete), nil — активна
+	// Сводные поля, заполняемые репозиторием при чтении списка:
+	// — nomenclatures.code / nomenclatures.name (LEFT JOIN по nomenclature_id);
+	// — текущее закрепление: cards.number/full_name (employee) или
+	//   departments.code/name (department). nil до заполнения.
+	NomenclatureCode *string
+	NomenclatureName *string
+	CardNumber       *int
+	CardFullName     *string
+	DepartmentCode   *int16
+	DepartmentName   *string
 }
 
 // EquipmentInput — входные данные для создания оборудования. Пустые строки
 // приводятся к nil (NULL в БД); пустой Status — значение по умолчанию
-// StatusExp (DEFAULT 'exp' в схеме).
+// StatusExp (DEFAULT exp в схеме).
 type EquipmentInput struct {
 	InventoryNumber string
 	SerialNumber    string
@@ -131,19 +141,19 @@ func NewEquipment(in EquipmentInput) (*Equipment, error) {
 			ErrInvalidField, *in.NomenclatureID)
 	}
 
-	serialNumber, err := optString(in.SerialNumber, "serial_number", maxSerialNumberLen)
+	serialNumber, err := optString(in.SerialNumber, "serial_number", tMaxSerialNumberLen)
 	if err != nil {
 		return nil, err
 	}
-	modelName, err := optString(in.ModelName, "model_name", maxModelNameLen)
+	modelName, err := optString(in.ModelName, "model_name", tMaxModelNameLen)
 	if err != nil {
 		return nil, err
 	}
-	formNumber, err := optString(in.FormNumber, "form_number", maxFormNumberLen)
+	formNumber, err := optString(in.FormNumber, "form_number", tMaxFormNumberLen)
 	if err != nil {
 		return nil, err
 	}
-	location, err := optString(in.Location, "location", maxLocationLen)
+	location, err := optString(in.Location, "location", tMaxLocationLen)
 	if err != nil {
 		return nil, err
 	}
@@ -190,28 +200,28 @@ type EquipmentUpdate struct {
 // не изменяются. При некорректном значении возвращает ошибку, не меняя модель.
 func (e *Equipment) ApplyUpdate(up EquipmentUpdate) error {
 	if up.SerialNumber != nil {
-		v, err := optString(*up.SerialNumber, "serial_number", maxSerialNumberLen)
+		v, err := optString(*up.SerialNumber, "serial_number", tMaxSerialNumberLen)
 		if err != nil {
 			return err
 		}
 		e.SerialNumber = v
 	}
 	if up.ModelName != nil {
-		v, err := optString(*up.ModelName, "model_name", maxModelNameLen)
+		v, err := optString(*up.ModelName, "model_name", tMaxModelNameLen)
 		if err != nil {
 			return err
 		}
 		e.ModelName = v
 	}
 	if up.FormNumber != nil {
-		v, err := optString(*up.FormNumber, "form_number", maxFormNumberLen)
+		v, err := optString(*up.FormNumber, "form_number", tMaxFormNumberLen)
 		if err != nil {
 			return err
 		}
 		e.FormNumber = v
 	}
 	if up.Location != nil {
-		v, err := optString(*up.Location, "location", maxLocationLen)
+		v, err := optString(*up.Location, "location", tMaxLocationLen)
 		if err != nil {
 			return err
 		}
@@ -258,20 +268,25 @@ func (e *Equipment) SoftDelete() {
 }
 
 // EquipmentFilter — параметры фильтрации списка оборудования. nil-поле
-// означает «не фильтровать по полю». Строковые поля матчятся частично без
-// учёта регистра (ILIKE '%...%'), status — точное совпадение со значением
-// enum. Активность разведена по маршрутам /equipments и /equipments/inactive.
+// означает «не фильтровать по полю». Строковые поля матчатся частично без
+// учёта регистра (ILIKE %...%), коды/номера/статус — точное совпадение.
+// Активность разведена по маршрутам /equipments и /equipments/inactive.
 type EquipmentFilter struct {
-	InventoryNumber *string          // подстрока инвентарного номера
-	SerialNumber    *string          // подстрока серийного номера
-	ModelName       *string          // подстрока модели
-	Status          *EquipmentStatus // точное значение статуса
-	Location        *string          // подстрока локации
+	InventoryNumber  *string          // подстрока инвентарного номера
+	SerialNumber     *string          // подстрока серийного номера
+	ModelName        *string          // подстрока модели
+	Status           *EquipmentStatus // точное значение статуса
+	Location         *string          // подстрока локации
+	NomenclatureCode *string          // точный код номенклатуры
+	NomenclatureName *string          // подстрока наименования номенклатуры
+	CardNumber       *int             // точный номер карточки
+	CardFullName     *string          // подстрока ФИО ответственного
+	DepartmentCode   *int16           // точный код подразделения
+	DepartmentName   *string          // подстрока наименования подразделения
 }
 
 // optString нормализует опциональную строку: пустая (после обрезки краёв) →
-// nil (NULL), иначе — значение с проверкой лимита. Проверяет уже
-// нормализованное значение.
+// nil (NULL), иначе — значение с проверкой лимита.
 func optString(field, name string, maxLen int) (*string, error) {
 	v := normalizeName(field)
 	if v == "" {

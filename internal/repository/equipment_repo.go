@@ -31,6 +31,19 @@ const equipmentColumns = `id, inventory_number, serial_number, nomenclature_id, 
     manufacture_date, arrival_date, status, form_number, location, notes,
     created_at, updated_at, deleted_at`
 
+// listEquipmentColumns — SELECT для list: оборудование + справочные данные
+// (номенклатура, текущее закрепление: карточка/подразделение).
+// Каждой записи соответствует ровно одна строка благодаря LATERAL-подзапросу
+// с LIMIT 1 (выбирается последнее закрепление по assigned_at, с учётом
+// связанных rows с тем же временем, идентификатором).
+const listEquipmentColumns = `
+    e.id, e.inventory_number, e.serial_number, e.nomenclature_id, e.model_name,
+    e.manufacture_date, e.arrival_date, e.status, e.form_number, e.location, e.notes,
+    e.created_at, e.updated_at, e.deleted_at,
+    n.code AS nomenclature_code, n.name AS nomenclature_name,
+    a.card_number AS assignment_card_number, c.full_name AS assignment_card_full_name,
+    d.code AS assignment_department_code, d.name AS assignment_department_name`
+
 func (r *EquipmentRepo) Create(ctx context.Context, eq *domain.Equipment) error {
 	row := r.pool.QueryRow(ctx, `
         INSERT INTO equipments (
@@ -101,29 +114,98 @@ func (r *EquipmentRepo) ListInactive(ctx context.Context, filter domain.Equipmen
 	return r.list(ctx, false, filter)
 }
 
-// list загружает оборудование с фильтром по активности (deleted_at) и
-// пользовательским фильтром (ILIKE по строкам, точное совпадение по статусу),
-// отсортированное по id.
-func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.EquipmentFilter) ([]*domain.Equipment, error) {
-	query := `SELECT ` + equipmentColumns + ` FROM equipments WHERE deleted_at IS NULL`
-	if !active {
-		query = `SELECT ` + equipmentColumns + ` FROM equipments WHERE deleted_at IS NOT NULL`
+// scanEquipmentList читает одну строку списка оборудования (с JOIN-ав) в
+// доменную модель. NULL-колонки сканируются в указатели; сводные поля
+// (номенклатура, текущее закрепление) заполняются из LEFT JOIN-ов.
+func scanEquipmentList(row rowScanner) (*domain.Equipment, error) {
+	var e domain.Equipment
+	var (
+		serialNumber             *string
+		nomenclatureID           *int
+		modelName                *string
+		manufactureDate          *time.Time
+		arrivalDate              *time.Time
+		formNumber               *string
+		location                 *string
+		notes                    *string
+		deletedAt                *time.Time
+		status                   string
+		nomenclatureCode         *string
+		nomenclatureName         *string
+		assignmentCardNumber     *int
+		assignmentCardFullName   *string
+		assignmentDepartmentCode *int16
+		assignmentDepartmentName *string
+	)
+	if err := row.Scan(
+		&e.ID, &e.InventoryNumber, &serialNumber, &nomenclatureID, &modelName,
+		&manufactureDate, &arrivalDate, &status, &formNumber, &location, &notes,
+		&e.CreatedAt, &e.UpdatedAt, &deletedAt,
+		&nomenclatureCode, &nomenclatureName,
+		&assignmentCardNumber, &assignmentCardFullName,
+		&assignmentDepartmentCode, &assignmentDepartmentName,
+	); err != nil {
+		return nil, err
 	}
+	e.SerialNumber = serialNumber
+	e.NomenclatureID = nomenclatureID
+	e.ModelName = modelName
+	e.ManufactureDate = manufactureDate
+	e.ArrivalDate = arrivalDate
+	e.Status = domain.EquipmentStatus(status)
+	e.FormNumber = formNumber
+	e.Location = location
+	e.Notes = notes
+	e.DeletedAt = deletedAt
+
+	e.NomenclatureCode = nomenclatureCode
+	e.NomenclatureName = nomenclatureName
+	e.CardNumber = assignmentCardNumber
+	e.CardFullName = assignmentCardFullName
+	e.DepartmentCode = assignmentDepartmentCode
+	e.DepartmentName = assignmentDepartmentName
+	return &e, nil
+}
+
+// list загружает оборудование с фильтром по активности и пользовательским
+// фильтром (ILIKE по строкам, точное совпадение по кодам/номерам/статусу),
+// отсортированное по id. Для каждой записи выбирается текущее (самое свежее)
+// закрепление: номенклатура, карточка или подразделение.
+func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.EquipmentFilter) ([]*domain.Equipment, error) {
+	query := `
+        SELECT ` + listEquipmentColumns + `
+        FROM equipments e
+        LEFT JOIN nomenclatures n ON n.id = e.nomenclature_id
+        LEFT JOIN LATERAL (
+            SELECT a.card_number, a.department_code
+            FROM equipments_assignments a
+            WHERE a.equipment_id = e.id
+            ORDER BY a.assigned_at DESC, a.id DESC
+            LIMIT 1
+        ) a ON TRUE
+        LEFT JOIN cards c ON c.number = a.card_number
+        LEFT JOIN departments d ON d.code = a.department_code`
+
 	var (
 		conds []string
 		args  []any
 	)
+	if active {
+		conds = append(conds, "deleted_at IS NULL")
+	} else {
+		conds = append(conds, "deleted_at IS NOT NULL")
+	}
 	if filter.InventoryNumber != nil {
 		args = append(args, *filter.InventoryNumber)
-		conds = append(conds, fmt.Sprintf("inventory_number ILIKE '%%' || $%d || '%%'", len(args)))
+		conds = append(conds, fmt.Sprintf("inventory_number ILIKE %% || $%d || %%", len(args)))
 	}
 	if filter.SerialNumber != nil {
 		args = append(args, *filter.SerialNumber)
-		conds = append(conds, fmt.Sprintf("serial_number ILIKE '%%' || $%d || '%%'", len(args)))
+		conds = append(conds, fmt.Sprintf("serial_number ILIKE %% || $%d || %%", len(args)))
 	}
 	if filter.ModelName != nil {
 		args = append(args, *filter.ModelName)
-		conds = append(conds, fmt.Sprintf("model_name ILIKE '%%' || $%d || '%%'", len(args)))
+		conds = append(conds, fmt.Sprintf("model_name ILIKE %% || $%d || %%", len(args)))
 	}
 	if filter.Status != nil {
 		args = append(args, string(*filter.Status))
@@ -131,12 +213,36 @@ func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.Equ
 	}
 	if filter.Location != nil {
 		args = append(args, *filter.Location)
-		conds = append(conds, fmt.Sprintf("location ILIKE '%%' || $%d || '%%'", len(args)))
+		conds = append(conds, fmt.Sprintf("location ILIKE %% || $%d || %%", len(args)))
+	}
+	if filter.NomenclatureCode != nil {
+		args = append(args, *filter.NomenclatureCode)
+		conds = append(conds, fmt.Sprintf("nomenclature_code = $%d", len(args)))
+	}
+	if filter.NomenclatureName != nil {
+		args = append(args, *filter.NomenclatureName)
+		conds = append(conds, fmt.Sprintf("nomenclature_name ILIKE %% || $%d || %%", len(args)))
+	}
+	if filter.CardNumber != nil {
+		args = append(args, *filter.CardNumber)
+		conds = append(conds, fmt.Sprintf("assignment_card_number = $%d", len(args)))
+	}
+	if filter.CardFullName != nil {
+		args = append(args, *filter.CardFullName)
+		conds = append(conds, fmt.Sprintf("assignment_card_full_name ILIKE %% || $%d || %%", len(args)))
+	}
+	if filter.DepartmentCode != nil {
+		args = append(args, *filter.DepartmentCode)
+		conds = append(conds, fmt.Sprintf("assignment_department_code = $%d", len(args)))
+	}
+	if filter.DepartmentName != nil {
+		args = append(args, *filter.DepartmentName)
+		conds = append(conds, fmt.Sprintf("assignment_department_name ILIKE %% || $%d || %%", len(args)))
 	}
 	if len(conds) > 0 {
-		query += " AND " + strings.Join(conds, " AND ")
+		query += " WHERE " + strings.Join(conds, " AND ")
 	}
-	query += " ORDER BY id"
+	query += " ORDER BY e.id"
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -146,7 +252,7 @@ func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.Equ
 
 	items := make([]*domain.Equipment, 0)
 	for rows.Next() {
-		eq, err := scanEquipment(rows)
+		eq, err := scanEquipmentList(rows)
 		if err != nil {
 			return nil, fmt.Errorf("scan equipment: %w", err)
 		}
@@ -158,6 +264,8 @@ func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.Equ
 	return items, nil
 }
 
+// ExistsInventoryNumber сообщает, есть ли оборудование с таким номером
+// (в любом статусе — UNIQUE действует и для удалённых записей).
 func (r *EquipmentRepo) ExistsInventoryNumber(ctx context.Context, number string) (bool, error) {
 	var exists bool
 	if err := r.pool.QueryRow(ctx, `

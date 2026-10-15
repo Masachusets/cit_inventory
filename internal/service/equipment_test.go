@@ -94,8 +94,40 @@ func (f *fakeEquipmentRepo) ListInactive(_ context.Context, filter domain.Equipm
 	return out, nil
 }
 
-// matchFilter имитирует фильтрацию: ILIKE '%...%' по строкам и точное
-// совпадение по статусу.
+// ExistsInventoryNumber считает обращения и сообщает о наличии номера.
+func (f *fakeEquipmentRepo) ExistsInventoryNumber(_ context.Context, number string) (bool, error) {
+	f.existsCalls++
+	_, ok := f.byKey[number]
+	return ok, nil
+}
+
+// Update сохраняет обновлённую модель по id (копию не создаёт — сервис
+// и так работает с загруженной копией).
+func (f *fakeEquipmentRepo) Update(_ context.Context, id int, eq *domain.Equipment) error {
+	if _, ok := f.items[id]; !ok {
+		return domain.ErrNotFound
+	}
+	f.items[id] = eq
+	f.byKey[eq.InventoryNumber] = id
+	return nil
+}
+
+// SoftDelete заполняет deleted_at (идемпотентно, как COALESCE в SQL).
+func (f *fakeEquipmentRepo) SoftDelete(_ context.Context, id int) error {
+	f.softDeleteCalls++
+	eq, ok := f.items[id]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if eq.DeletedAt == nil {
+		now := time.Now()
+		eq.DeletedAt = &now
+	}
+	return nil
+}
+
+// matchFilter имитирует фильтрацию: ILIKE %...% по строкам и точное
+// совпадение по статусу, кодам и номерам.
 func matchFilter(eq *domain.Equipment, f domain.EquipmentFilter) bool {
 	if f.InventoryNumber != nil && !strings.Contains(strings.ToLower(eq.InventoryNumber), strings.ToLower(*f.InventoryNumber)) {
 		return false
@@ -112,35 +144,48 @@ func matchFilter(eq *domain.Equipment, f domain.EquipmentFilter) bool {
 	if f.Location != nil && (eq.Location == nil || !strings.Contains(strings.ToLower(*eq.Location), strings.ToLower(*f.Location))) {
 		return false
 	}
+	if f.NomenclatureCode != nil && (eq.NomenclatureCode == nil || *f.NomenclatureCode != *eq.NomenclatureCode) {
+		return false
+	}
+	if f.NomenclatureName != nil && (eq.NomenclatureName == nil || !strings.Contains(strings.ToLower(*eq.NomenclatureName), strings.ToLower(*f.NomenclatureName))) {
+		return false
+	}
+	if f.CardNumber != nil && (eq.CardNumber == nil || *f.CardNumber != *eq.CardNumber) {
+		return false
+	}
+	if f.CardFullName != nil && (eq.CardFullName == nil || !strings.Contains(strings.ToLower(*eq.CardFullName), strings.ToLower(*f.CardFullName))) {
+		return false
+	}
+	if f.DepartmentCode != nil && (eq.DepartmentCode == nil || *f.DepartmentCode != *eq.DepartmentCode) {
+		return false
+	}
+	if f.DepartmentName != nil && (eq.DepartmentName == nil || !strings.Contains(strings.ToLower(*eq.DepartmentName), strings.ToLower(*f.DepartmentName))) {
+		return false
+	}
 	return true
 }
 
-func (f *fakeEquipmentRepo) ExistsInventoryNumber(_ context.Context, number string) (bool, error) {
-	f.existsCalls++
-	_, ok := f.byKey[number]
-	return ok, nil
+// equipmentWithRelations — тестовая запись оборудования со сводными полями
+// (номенклатура, карточка, подразделение) для проверки фильтров списков.
+func equipmentWithRelations() *domain.Equipment {
+	eq, _ := domain.NewEquipment(domain.EquipmentInput{InventoryNumber: "ИТ00042"})
+	eq.NomenclatureCode = strPtrTest("08.01.02.00.00/0041")
+	eq.NomenclatureName = strPtrTest("Ноутбук")
+	eq.CardNumber = intPtrTest(101)
+	eq.CardFullName = strPtrTest("Иванов")
+	eq.DepartmentCode = int16PtrTest(100)
+	eq.DepartmentName = strPtrTest("опк Гомель")
+	return eq
 }
 
-func (f *fakeEquipmentRepo) Update(_ context.Context, id int, eq *domain.Equipment) error {
-	if _, ok := f.items[id]; !ok {
-		return domain.ErrNotFound
-	}
-	f.items[id] = eq
-	return nil
-}
+// strPtrTest — локальный хелпер указателя на строку.
+func strPtrTest(v string) *string { return &v }
 
-func (f *fakeEquipmentRepo) SoftDelete(_ context.Context, id int) error {
-	f.softDeleteCalls++
-	eq, ok := f.items[id]
-	if !ok {
-		return domain.ErrNotFound
-	}
-	if eq.DeletedAt == nil {
-		now := time.Now()
-		eq.DeletedAt = &now
-	}
-	return nil
-}
+// intPtrTest — локальный хелпер указателя на int.
+func intPtrTest(v int) *int { return &v }
+
+// int16PtrTest — локальный хелпер указателя на int16.
+func int16PtrTest(v int16) *int16 { return &v }
 
 func TestEquipmentService_Create(t *testing.T) {
 	repo := newFakeEquipmentRepo()
@@ -167,7 +212,7 @@ func TestEquipmentService_Create_Duplicate(t *testing.T) {
 	svc := NewEquipmentService(repo)
 
 	_, err := svc.Create(context.Background(), domain.EquipmentInput{InventoryNumber: "ИТ00001"})
-	if !errors.Is(err, domain.ErrAlreadyExists) {
+	if errors.Is(err, domain.ErrAlreadyExists) == false {
 		t.Errorf("err = %v, want ErrAlreadyExists", err)
 	}
 }
@@ -177,7 +222,7 @@ func TestEquipmentService_Create_InvalidNumber(t *testing.T) {
 	svc := NewEquipmentService(repo)
 
 	_, err := svc.Create(context.Background(), domain.EquipmentInput{InventoryNumber: "123"})
-	if !errors.Is(err, domain.ErrInvalidInventoryNumber) {
+	if errors.Is(err, domain.ErrInvalidInventoryNumber) == false {
 		t.Errorf("err = %v, want ErrInvalidInventoryNumber", err)
 	}
 	if repo.existsCalls != 0 {
@@ -201,10 +246,11 @@ func TestEquipmentService_GetByID(t *testing.T) {
 
 func TestEquipmentService_GetByID_InvalidID(t *testing.T) {
 	svc := NewEquipmentService(newFakeEquipmentRepo())
-	if _, err := svc.GetByID(context.Background(), 0); !errors.Is(err, domain.ErrInvalidID) {
-		t.Errorf("err = %v, want ErrInvalidID", err)
+
+	if _, err := svc.GetByID(context.Background(), 0); errors.Is(err, domain.ErrInvalidID) == false {
+		t.Errorf("id=0: err = %v, want ErrInvalidID", err)
 	}
-	if _, err := svc.GetByID(context.Background(), 5); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := svc.GetByID(context.Background(), 999); errors.Is(err, domain.ErrNotFound) == false {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
@@ -222,10 +268,10 @@ func TestEquipmentService_GetByInventoryNumber(t *testing.T) {
 		t.Errorf("InventoryNumber = %q", eq.InventoryNumber)
 	}
 
-	if _, err := svc.GetByInventoryNumber(context.Background(), "xx"); !errors.Is(err, domain.ErrInvalidInventoryNumber) {
+	if _, err := svc.GetByInventoryNumber(context.Background(), "12345"); errors.Is(err, domain.ErrInvalidInventoryNumber) == false {
 		t.Errorf("невалидный номер: err = %v, want ErrInvalidInventoryNumber", err)
 	}
-	if _, err := svc.GetByInventoryNumber(context.Background(), "ИТ99999"); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := svc.GetByInventoryNumber(context.Background(), "ИТ99999"); errors.Is(err, domain.ErrNotFound) == false {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
@@ -280,17 +326,17 @@ func TestEquipmentService_UpdateByID_Errors(t *testing.T) {
 	svc := NewEquipmentService(newFakeEquipmentRepo())
 	bad := "нет"
 
-	if _, err := svc.UpdateByID(context.Background(), 0, domain.EquipmentUpdate{}); !errors.Is(err, domain.ErrInvalidID) {
+	if _, err := svc.UpdateByID(context.Background(), 0, domain.EquipmentUpdate{Status: &bad}); errors.Is(err, domain.ErrInvalidID) == false {
 		t.Errorf("id=0: err = %v, want ErrInvalidID", err)
 	}
-	if _, err := svc.UpdateByID(context.Background(), 1, domain.EquipmentUpdate{}); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := svc.UpdateByID(context.Background(), 999, domain.EquipmentUpdate{Status: &bad}); errors.Is(err, domain.ErrNotFound) == false {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 
 	repo := newFakeEquipmentRepo()
 	id := repo.seed(&domain.Equipment{InventoryNumber: "ИТ00001", Status: domain.StatusExp})
 	svc = NewEquipmentService(repo)
-	if _, err := svc.UpdateByID(context.Background(), id, domain.EquipmentUpdate{Status: &bad}); !errors.Is(err, domain.ErrInvalidStatus) {
+	if _, err := svc.UpdateByID(context.Background(), id, domain.EquipmentUpdate{Status: &bad}); errors.Is(err, domain.ErrInvalidStatus) == false {
 		t.Errorf("err = %v, want ErrInvalidStatus", err)
 	}
 }
@@ -362,10 +408,10 @@ func TestEquipmentService_DeleteByID_Idempotent(t *testing.T) {
 
 func TestEquipmentService_DeleteByID_Errors(t *testing.T) {
 	svc := NewEquipmentService(newFakeEquipmentRepo())
-	if _, err := svc.DeleteByID(context.Background(), 0); !errors.Is(err, domain.ErrInvalidID) {
-		t.Errorf("err = %v, want ErrInvalidID", err)
+	if _, err := svc.DeleteByID(context.Background(), 0); errors.Is(err, domain.ErrInvalidID) == false {
+		t.Errorf("id=0: err = %v, want ErrInvalidID", err)
 	}
-	if _, err := svc.DeleteByID(context.Background(), 1); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := svc.DeleteByID(context.Background(), 999); errors.Is(err, domain.ErrNotFound) == false {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
@@ -382,7 +428,50 @@ func TestEquipmentService_DeleteByInventoryNumber(t *testing.T) {
 	if eq.ID != id || eq.DeletedAt == nil {
 		t.Errorf("eq = %+v", eq)
 	}
-	if _, err := svc.DeleteByInventoryNumber(context.Background(), "ИТ00043"); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := svc.DeleteByInventoryNumber(context.Background(), "ИТ99999"); errors.Is(err, domain.ErrNotFound) == false {
 		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestEquipmentService_ListActive_Filters(t *testing.T) {
+	repo := newFakeEquipmentRepo()
+	eq := equipmentWithRelations()
+	repo.seed(eq)
+	svc := NewEquipmentService(repo)
+	ctx := context.Background()
+
+	check := func(name string, f domain.EquipmentFilter, wantLen int) {
+		got, err := svc.ListActive(ctx, f)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", name, err)
+		}
+		if len(got) != wantLen {
+			t.Errorf("%s: len(got) = %d, want %d", name, len(got), wantLen)
+		}
+	}
+
+	check("NomenclatureCode", domain.EquipmentFilter{NomenclatureCode: strPtrTest("08.01.02.00.00/0041")}, 1)
+	check("NomenclatureName", domain.EquipmentFilter{NomenclatureName: strPtrTest("Ноутбук")}, 1)
+	check("CardNumber", domain.EquipmentFilter{CardNumber: intPtrTest(101)}, 1)
+	check("CardFullName", domain.EquipmentFilter{CardFullName: strPtrTest("Иван")}, 1)
+	check("DepartmentCode", domain.EquipmentFilter{DepartmentCode: int16PtrTest(100)}, 1)
+	check("DepartmentName", domain.EquipmentFilter{DepartmentName: strPtrTest("Гомель")}, 1)
+	status := domain.StatusExp
+	check("Status", domain.EquipmentFilter{Status: &status}, 1)
+}
+
+func TestEquipmentService_ListActive_Filters_Empty(t *testing.T) {
+	repo := newFakeEquipmentRepo()
+	eq := equipmentWithRelations()
+	repo.seed(eq)
+	svc := NewEquipmentService(repo)
+	ctx := context.Background()
+
+	got, err := svc.ListActive(ctx, domain.EquipmentFilter{NomenclatureCode: strPtrTest("000000")})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("len(got) = %d, want 0", len(got))
 	}
 }

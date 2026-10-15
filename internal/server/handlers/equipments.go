@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -61,20 +62,46 @@ type updateEquipmentRequest struct {
 // deleted_at сериализуются как значение либо null; DATE-колонки — YYYY-MM-DD,
 // технические метки — RFC3339.
 type equipmentResponse struct {
-	ID              int     `json:"id"`
-	InventoryNumber string  `json:"inventory_number"`
-	SerialNumber    *string `json:"serial_number"`
-	NomenclatureID  *int    `json:"nomenclature_id"`
-	ModelName       *string `json:"model_name"`
-	ManufactureDate *string `json:"manufacture_date"`
-	ArrivalDate     *string `json:"arrival_date"`
-	Status          string  `json:"status"`
-	FormNumber      *string `json:"form_number"`
-	Location        *string `json:"location"`
-	Notes           *string `json:"notes"`
-	CreatedAt       string  `json:"created_at"`
-	UpdatedAt       string  `json:"updated_at"`
-	DeletedAt       *string `json:"deleted_at"`
+	ID              int                            `json:"id"`
+	InventoryNumber string                         `json:"inventory_number"`
+	SerialNumber    *string                        `json:"serial_number"`
+	NomenclatureID  *int                           `json:"nomenclature_id"`
+	Nomenclature    *equipmentNomenclatureResponse `json:"nomenclature"`
+	ModelName       *string                        `json:"model_name"`
+	ManufactureDate *string                        `json:"manufacture_date"`
+	ArrivalDate     *string                        `json:"arrival_date"`
+	Status          string                         `json:"status"`
+	FormNumber      *string                        `json:"form_number"`
+	Location        *string                        `json:"location"`
+	Notes           *string                        `json:"notes"`
+	CreatedAt       string                         `json:"created_at"`
+	UpdatedAt       string                         `json:"updated_at"`
+	DeletedAt       *string                        `json:"deleted_at"`
+	Assignment      *equipmentAssignmentResponse   `json:"assignment"`
+}
+
+// nomenclatureResponse — сводное представление номенклатуры в ответе списка.
+type equipmentNomenclatureResponse struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// assignmentResponse — сводное представление закрепления в ответе списка.
+type equipmentAssignmentResponse struct {
+	Card       *assignmentCardResponse       `json:"card"`
+	Department *assignmentDepartmentResponse `json:"department"`
+}
+
+// assignmentCardResponse — сводное представление карточки в закреплении.
+type assignmentCardResponse struct {
+	Number   int    `json:"number"`
+	FullName string `json:"full_name"`
+}
+
+// assignmentDepartmentResponse — сводное представление подразделения в закреплении.
+type assignmentDepartmentResponse struct {
+	Code int16  `json:"code"`
+	Name string `json:"name"`
 }
 
 // toEquipmentResponse преобразует доменную модель в JSON-ответ.
@@ -89,8 +116,9 @@ func toEquipmentResponse(eq *domain.Equipment) equipmentResponse {
 		FormNumber:      eq.FormNumber,
 		Location:        eq.Location,
 		Notes:           eq.Notes,
-		CreatedAt:       eq.CreatedAt.Format(timeFormat),
-		UpdatedAt:       eq.UpdatedAt.Format(timeFormat),
+
+		CreatedAt: eq.CreatedAt.Format(timeFormat),
+		UpdatedAt: eq.UpdatedAt.Format(timeFormat),
 	}
 	if eq.ManufactureDate != nil {
 		s := eq.ManufactureDate.Format(dateFormat)
@@ -104,6 +132,24 @@ func toEquipmentResponse(eq *domain.Equipment) equipmentResponse {
 		s := eq.DeletedAt.Format(timeFormat)
 		resp.DeletedAt = &s
 	}
+	if eq.NomenclatureCode != nil || eq.NomenclatureName != nil {
+		resp.Nomenclature = &equipmentNomenclatureResponse{
+			Code: deref(eq.NomenclatureCode),
+			Name: deref(eq.NomenclatureName),
+		}
+	}
+	if eq.CardNumber != nil || eq.CardFullName != nil || eq.DepartmentCode != nil || eq.DepartmentName != nil {
+		resp.Assignment = &equipmentAssignmentResponse{
+			Card: &assignmentCardResponse{
+				Number:   derefInt(eq.CardNumber),
+				FullName: deref(eq.CardFullName),
+			},
+			Department: &assignmentDepartmentResponse{
+				Code: derefInt16(eq.DepartmentCode),
+				Name: deref(eq.DepartmentName),
+			},
+		}
+	}
 	return resp
 }
 
@@ -116,10 +162,37 @@ func toEquipmentResponses(items []*domain.Equipment) []equipmentResponse {
 	return resp
 }
 
+// deref возвращает значение указателя, если он не nil, и пустую строку — иначе.
+func deref(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
+// derefInt возвращает значение указателя на int, если он не nil, и 0 — иначе.
+func derefInt(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+// derefInt16 возвращает значение указателя на int16, если он не nil, и 0 —
+// иначе.
+func derefInt16(v *int16) int16 {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
 // parseEquipmentFilter извлекает фильтр из query-параметров
 // ?inventory_number=...&serial_number=...&model_name=...&status=...&location=...
+// &nomenclature_code=...&nomenclature_name=...&card_number=...&card_full_name=...
+// &department_code=...&department_name=...
 // Пустые или отсутствующие параметры не фильтруют соответствующее поле;
-// некорректный статус — 400.
+// некорректный статус/номер — 400.
 func parseEquipmentFilter(w http.ResponseWriter, r *http.Request) (domain.EquipmentFilter, bool) {
 	var f domain.EquipmentFilter
 	q := r.URL.Query()
@@ -135,10 +208,44 @@ func parseEquipmentFilter(w http.ResponseWriter, r *http.Request) (domain.Equipm
 	if v := q.Get("location"); v != "" {
 		f.Location = &v
 	}
+	if v := q.Get("nomenclature_code"); v != "" {
+		f.NomenclatureCode = &v
+	}
+	if v := q.Get("nomenclature_name"); v != "" {
+		f.NomenclatureName = &v
+	}
+	if v := q.Get("card_number"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			f.CardNumber = &n
+		} else {
+			respondError(w, r, http.StatusBadRequest, "invalid card_number")
+			return f, false
+		}
+	}
+	if v := q.Get("card_full_name"); v != "" {
+		f.CardFullName = &v
+	}
+	if v := q.Get("department_code"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			if n <= 0 || n > math.MaxInt16 {
+				respondError(w, r, http.StatusBadRequest, "invalid department_code")
+				return f, false
+			}
+			deptCode := int16(n)
+			f.DepartmentCode = &deptCode
+		} else {
+			respondError(w, r, http.StatusBadRequest, "invalid department_code")
+			return f, false
+		}
+	}
+	if v := q.Get("department_name"); v != "" {
+		f.DepartmentName = &v
+	}
 	if v := q.Get("status"); v != "" {
 		st, err := domain.ParseEquipmentStatus(v)
 		if err != nil {
-			respondError(w, r, http.StatusBadRequest, "invalid status, want one of: exp, exp_int, exp_sp, broken, written_off")
+			respondError(w, r, http.StatusBadRequest,
+				"invalid status, want one of: exp, exp_int, exp_sp, broken, written_off")
 			return f, false
 		}
 		f.Status = &st
@@ -377,7 +484,7 @@ func buildEquipmentUpdate(w http.ResponseWriter, r *http.Request, req updateEqui
 }
 
 // parseUpdateDate парсит опциональную дату YYYY-MM-DD из тела PATCH-запроса.
-// nil → (nil, true) — не менять; пустая строка → нулевое время (сигнал
+// nil → (nil, true) — не изменять; пустая строка → нулевое время (сигнал
 // «очистить колонку» в домене); мусор → ошибка 400.
 func parseUpdateDate(w http.ResponseWriter, r *http.Request, raw *string, field string) (*time.Time, bool) {
 	if raw == nil {

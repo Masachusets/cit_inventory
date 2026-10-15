@@ -112,7 +112,7 @@ func TestNewEquipment_Status(t *testing.T) {
 
 func TestNewEquipment_FieldLimits(t *testing.T) {
 	in := validInput()
-	in.SerialNumber = strings.Repeat("s", maxSerialNumberLen+1)
+	in.SerialNumber = strings.Repeat("s", tMaxSerialNumberLen+1)
 	if _, err := NewEquipment(in); !errors.Is(err, ErrInvalidField) {
 		t.Errorf("длинный serial_number: err = %v, want ErrInvalidField", err)
 	}
