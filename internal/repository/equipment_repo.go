@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
@@ -167,11 +166,35 @@ func scanEquipmentList(row rowScanner) (*domain.Equipment, error) {
 	return &e, nil
 }
 
-// list загружает оборудование с фильтром по активности и пользовательским
-// фильтром (ILIKE по строкам, точное совпадение по кодам/номерам/статусу),
-// отсортированное по id. Для каждой записи выбирается текущее (самое свежее)
-// закрепление: номенклатура, карточка или подразделение.
-func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.EquipmentFilter) ([]*domain.Equipment, error) {
+// equipmentsListQuery собирает SELECT списка оборудования (чистая функция —
+// тестируется без БД).
+func equipmentsListQuery(active bool, filter domain.EquipmentFilter) (string, []any) {
+	var f filterBuilder
+	if active {
+		f.cond("deleted_at IS NULL")
+	} else {
+		f.cond("deleted_at IS NOT NULL")
+	}
+	f.ilike("inventory_number", filter.InventoryNumber)
+	f.ilike("serial_number", filter.SerialNumber)
+	f.ilike("model_name", filter.ModelName)
+	if filter.Status != nil {
+		f.add("status = $%d::equipment_status", string(*filter.Status))
+	}
+	f.ilike("location", filter.Location)
+	if filter.NomenclatureCode != nil {
+		f.add("nomenclature_code = $%d", *filter.NomenclatureCode)
+	}
+	f.ilike("nomenclature_name", filter.NomenclatureName)
+	if filter.CardNumber != nil {
+		f.add("assignment_card_number = $%d", *filter.CardNumber)
+	}
+	f.ilike("assignment_card_full_name", filter.CardFullName)
+	if filter.DepartmentCode != nil {
+		f.add("assignment_department_code = $%d", *filter.DepartmentCode)
+	}
+	f.ilike("assignment_department_name", filter.DepartmentName)
+
 	query := `
         SELECT ` + listEquipmentColumns + `
         FROM equipments e
@@ -185,64 +208,15 @@ func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.Equ
         ) a ON TRUE
         LEFT JOIN cards c ON c.number = a.card_number
         LEFT JOIN departments d ON d.code = a.department_code`
+	return f.where(query) + " ORDER BY e.id", f.args
+}
 
-	var (
-		conds []string
-		args  []any
-	)
-	if active {
-		conds = append(conds, "deleted_at IS NULL")
-	} else {
-		conds = append(conds, "deleted_at IS NOT NULL")
-	}
-	if filter.InventoryNumber != nil {
-		args = append(args, *filter.InventoryNumber)
-		conds = append(conds, fmt.Sprintf("inventory_number ILIKE %% || $%d || %%", len(args)))
-	}
-	if filter.SerialNumber != nil {
-		args = append(args, *filter.SerialNumber)
-		conds = append(conds, fmt.Sprintf("serial_number ILIKE %% || $%d || %%", len(args)))
-	}
-	if filter.ModelName != nil {
-		args = append(args, *filter.ModelName)
-		conds = append(conds, fmt.Sprintf("model_name ILIKE %% || $%d || %%", len(args)))
-	}
-	if filter.Status != nil {
-		args = append(args, string(*filter.Status))
-		conds = append(conds, fmt.Sprintf("status = $%d::equipment_status", len(args)))
-	}
-	if filter.Location != nil {
-		args = append(args, *filter.Location)
-		conds = append(conds, fmt.Sprintf("location ILIKE %% || $%d || %%", len(args)))
-	}
-	if filter.NomenclatureCode != nil {
-		args = append(args, *filter.NomenclatureCode)
-		conds = append(conds, fmt.Sprintf("nomenclature_code = $%d", len(args)))
-	}
-	if filter.NomenclatureName != nil {
-		args = append(args, *filter.NomenclatureName)
-		conds = append(conds, fmt.Sprintf("nomenclature_name ILIKE %% || $%d || %%", len(args)))
-	}
-	if filter.CardNumber != nil {
-		args = append(args, *filter.CardNumber)
-		conds = append(conds, fmt.Sprintf("assignment_card_number = $%d", len(args)))
-	}
-	if filter.CardFullName != nil {
-		args = append(args, *filter.CardFullName)
-		conds = append(conds, fmt.Sprintf("assignment_card_full_name ILIKE %% || $%d || %%", len(args)))
-	}
-	if filter.DepartmentCode != nil {
-		args = append(args, *filter.DepartmentCode)
-		conds = append(conds, fmt.Sprintf("assignment_department_code = $%d", len(args)))
-	}
-	if filter.DepartmentName != nil {
-		args = append(args, *filter.DepartmentName)
-		conds = append(conds, fmt.Sprintf("assignment_department_name ILIKE %% || $%d || %%", len(args)))
-	}
-	if len(conds) > 0 {
-		query += " WHERE " + strings.Join(conds, " AND ")
-	}
-	query += " ORDER BY e.id"
+// list загружает оборудование с фильтром по активности и пользовательским
+// фильтром (ILIKE по строкам, точное совпадение по кодам/номерам/статусу),
+// отсортированное по id. Для каждой записи выбирается текущее (самое свежее)
+// закрепление: номенклатура, карточка или подразделение.
+func (r *EquipmentRepo) list(ctx context.Context, active bool, filter domain.EquipmentFilter) ([]*domain.Equipment, error) {
+	query, args := equipmentsListQuery(active, filter)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

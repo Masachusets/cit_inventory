@@ -66,42 +66,23 @@ func (r *CardRepo) ListInactive(ctx context.Context, filter domain.CardFilter) (
 	return r.list(ctx, false, filter)
 }
 
+// cardsListQuery собирает SELECT списка карточек (чистая функция — тестируется
+// без БД). Границы дат сравниваются по дню: колонка TIMESTAMPTZ приводится к
+// date, поэтому весь день «до» включён в выборку.
+func cardsListQuery(active bool, filter domain.CardFilter) (string, []any) {
+	var f filterBuilder
+	f.add("is_active = $%d", active)
+	f.ilike("full_name", filter.FullName)
+	f.dateRange("created_at", filter.CreatedAtFrom, filter.CreatedAtTo)
+	f.dateRange("updated_at", filter.UpdatedAtFrom, filter.UpdatedAtTo)
+	f.dateRange("deleted_at", filter.DeletedAtFrom, filter.DeletedAtTo)
+	return f.where("SELECT "+cardColumns+" FROM cards") + " ORDER BY number", f.args
+}
+
 // list загружает карточки с фильтром по активности и пользовательским
 // фильтром (подстрока ФИО, диапазоны дат), отсортированные по номеру.
-// Границы дат сравниваются по дню: колонка TIMESTAMPTZ приводится к date,
-// поэтому весь день «до» включён в выборку.
 func (r *CardRepo) list(ctx context.Context, active bool, filter domain.CardFilter) ([]*domain.Card, error) {
-	query := `SELECT ` + cardColumns + ` FROM cards WHERE is_active = $1`
-	args := []any{active}
-	if filter.FullName != nil {
-		args = append(args, *filter.FullName)
-		query += fmt.Sprintf(` AND full_name ILIKE '%%' || $%d || '%%'`, len(args))
-	}
-	if filter.CreatedAtFrom != nil {
-		args = append(args, *filter.CreatedAtFrom)
-		query += fmt.Sprintf(" AND created_at::date >= $%d::date", len(args))
-	}
-	if filter.CreatedAtTo != nil {
-		args = append(args, *filter.CreatedAtTo)
-		query += fmt.Sprintf(" AND created_at::date <= $%d::date", len(args))
-	}
-	if filter.UpdatedAtFrom != nil {
-		args = append(args, *filter.UpdatedAtFrom)
-		query += fmt.Sprintf(" AND updated_at::date >= $%d::date", len(args))
-	}
-	if filter.UpdatedAtTo != nil {
-		args = append(args, *filter.UpdatedAtTo)
-		query += fmt.Sprintf(" AND updated_at::date <= $%d::date", len(args))
-	}
-	if filter.DeletedAtFrom != nil {
-		args = append(args, *filter.DeletedAtFrom)
-		query += fmt.Sprintf(" AND deleted_at::date >= $%d::date", len(args))
-	}
-	if filter.DeletedAtTo != nil {
-		args = append(args, *filter.DeletedAtTo)
-		query += fmt.Sprintf(" AND deleted_at::date <= $%d::date", len(args))
-	}
-	query += " ORDER BY number"
+	query, args := cardsListQuery(active, filter)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

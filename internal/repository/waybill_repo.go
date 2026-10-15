@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
@@ -59,32 +58,18 @@ func (r *WaybillRepo) GetByID(ctx context.Context, id int) (*domain.Waybill, err
 	return wb, nil
 }
 
+// waybillsListQuery собирает SELECT списка путевых листов (чистая функция —
+// тестируется без БД). Диапазон issue_date — по дню, включительно.
+func waybillsListQuery(filter domain.WaybillFilter) (string, []any) {
+	var f filterBuilder
+	f.ilike("name", filter.Name)
+	f.ilike("number", filter.Number)
+	f.dateRange("issue_date", filter.IssueDateFrom, filter.IssueDateTo)
+	return f.where("SELECT "+waybillColumns+" FROM waybills") + " ORDER BY id", f.args
+}
+
 func (r *WaybillRepo) List(ctx context.Context, filter domain.WaybillFilter) ([]*domain.Waybill, error) {
-	query := `SELECT ` + waybillColumns + ` FROM waybills`
-	var (
-		conds []string
-		args  []any
-	)
-	if filter.Name != nil {
-		args = append(args, *filter.Name)
-		conds = append(conds, fmt.Sprintf("name ILIKE '%%' || $%d || '%%'", len(args)))
-	}
-	if filter.Number != nil {
-		args = append(args, *filter.Number)
-		conds = append(conds, fmt.Sprintf("number ILIKE '%%' || $%d || '%%'", len(args)))
-	}
-	if filter.IssueDateFrom != nil {
-		args = append(args, *filter.IssueDateFrom)
-		conds = append(conds, fmt.Sprintf("issue_date >= $%d", len(args)))
-	}
-	if filter.IssueDateTo != nil {
-		args = append(args, *filter.IssueDateTo)
-		conds = append(conds, fmt.Sprintf("issue_date <= $%d", len(args)))
-	}
-	if len(conds) > 0 {
-		query += " WHERE " + strings.Join(conds, " AND ")
-	}
-	query += " ORDER BY id"
+	query, args := waybillsListQuery(filter)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

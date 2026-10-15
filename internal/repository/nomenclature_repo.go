@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
 	"github.com/jackc/pgx/v5"
@@ -41,24 +40,17 @@ func (r *NomenclatureRepo) GetByID(ctx context.Context, id int) (*domain.Nomencl
 	return &n, nil
 }
 
+// nomenclaturesListQuery собирает SELECT списка номенклатуры (чистая функция —
+// тестируется без БД).
+func nomenclaturesListQuery(filter domain.NomenclatureFilter) (string, []any) {
+	var f filterBuilder
+	f.ilike("code", filter.Code)
+	f.ilike("name", filter.Name)
+	return f.where("SELECT "+nomenclatureColumns+" FROM nomenclatures") + " ORDER BY id", f.args
+}
+
 func (r *NomenclatureRepo) List(ctx context.Context, filter domain.NomenclatureFilter) ([]*domain.Nomenclature, error) {
-	query := `SELECT ` + nomenclatureColumns + ` FROM nomenclatures`
-	var (
-		conds []string
-		args  []any
-	)
-	if filter.Code != nil {
-		args = append(args, *filter.Code)
-		conds = append(conds, fmt.Sprintf("code ILIKE '%%' || $%d || '%%'", len(args)))
-	}
-	if filter.Name != nil {
-		args = append(args, *filter.Name)
-		conds = append(conds, fmt.Sprintf("name ILIKE '%%' || $%d || '%%'", len(args)))
-	}
-	if len(conds) > 0 {
-		query += " WHERE " + strings.Join(conds, " AND ")
-	}
-	query += " ORDER BY id"
+	query, args := nomenclaturesListQuery(filter)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

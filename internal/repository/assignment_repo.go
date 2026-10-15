@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
@@ -81,32 +80,25 @@ func (r *AssignmentRepo) GetByID(ctx context.Context, id int) (*domain.Assignmen
 	return a, nil
 }
 
-func (r *AssignmentRepo) List(ctx context.Context, filter domain.AssignmentFilter) ([]*domain.Assignment, error) {
-	query := assignmentSelect
-	var (
-		conds []string
-		args  []any
-	)
+// assignmentsListQuery собирает SELECT закрепления со связанными сущностями
+// (чистая функция — тестируется без БД). Диапазоны дат по дню, включительно.
+func assignmentsListQuery(filter domain.AssignmentFilter) (string, []any) {
+	var f filterBuilder
 	// Точные совпадения по идентификаторам и enum.
 	if filter.EquipmentID != nil {
-		args = append(args, *filter.EquipmentID)
-		conds = append(conds, fmt.Sprintf("a.equipment_id = $%d", len(args)))
+		f.add("a.equipment_id = $%d", *filter.EquipmentID)
 	}
 	if filter.TargetType != nil {
-		args = append(args, string(*filter.TargetType))
-		conds = append(conds, fmt.Sprintf("a.target_type = $%d::assignment_target", len(args)))
+		f.add("a.target_type = $%d::assignment_target", string(*filter.TargetType))
 	}
 	if filter.CardNumber != nil {
-		args = append(args, *filter.CardNumber)
-		conds = append(conds, fmt.Sprintf("a.card_number = $%d", len(args)))
+		f.add("a.card_number = $%d", *filter.CardNumber)
 	}
 	if filter.DepartmentCode != nil {
-		args = append(args, *filter.DepartmentCode)
-		conds = append(conds, fmt.Sprintf("a.department_code = $%d", len(args)))
+		f.add("a.department_code = $%d", *filter.DepartmentCode)
 	}
 	if filter.WaybillID != nil {
-		args = append(args, *filter.WaybillID)
-		conds = append(conds, fmt.Sprintf("a.waybill_id = $%d", len(args)))
+		f.add("a.waybill_id = $%d", *filter.WaybillID)
 	}
 	// Частичное совпадение строк (ILIKE) по закреплению и связанным сущностям.
 	for _, cond := range []struct {
@@ -120,41 +112,25 @@ func (r *AssignmentRepo) List(ctx context.Context, filter domain.AssignmentFilte
 		{filter.WaybillNumber, "w.number"},
 		{filter.OperatorComment, "a.operator_comment"},
 	} {
-		if cond.value != nil {
-			args = append(args, *cond.value)
-			conds = append(conds, fmt.Sprintf("%s ILIKE '%%' || $%d || '%%'", cond.expr, len(args)))
-		}
+		f.ilike(cond.expr, cond.value)
 	}
 	// Диапазоны дат: по дню (TIMESTAMPTZ → date), включительно.
-	for _, cond := range []struct {
-		value *time.Time
-		expr  string
-		op    string
-	}{
-		{filter.WaybillIssueDateFrom, "w.issue_date", ">="},
-		{filter.WaybillIssueDateTo, "w.issue_date", "<="},
-		{filter.AssignedAtFrom, "a.assigned_at::date", ">="},
-		{filter.AssignedAtTo, "a.assigned_at::date", "<="},
-		{filter.UnassignedAtFrom, "a.unassigned_at::date", ">="},
-		{filter.UnassignedAtTo, "a.unassigned_at::date", "<="},
-	} {
-		if cond.value != nil {
-			args = append(args, *cond.value)
-			conds = append(conds, fmt.Sprintf("%s %s $%d::date", cond.expr, cond.op, len(args)))
-		}
-	}
+	f.dateRange("w.issue_date", filter.WaybillIssueDateFrom, filter.WaybillIssueDateTo)
+	f.dateRange("a.assigned_at", filter.AssignedAtFrom, filter.AssignedAtTo)
+	f.dateRange("a.unassigned_at", filter.UnassignedAtFrom, filter.UnassignedAtTo)
 	// Активность: true — ещё закреплено, false — снято с закрепления.
 	if filter.Active != nil {
 		if *filter.Active {
-			conds = append(conds, "a.unassigned_at IS NULL")
+			f.cond("a.unassigned_at IS NULL")
 		} else {
-			conds = append(conds, "a.unassigned_at IS NOT NULL")
+			f.cond("a.unassigned_at IS NOT NULL")
 		}
 	}
-	if len(conds) > 0 {
-		query += " WHERE " + strings.Join(conds, " AND ")
-	}
-	query += " ORDER BY a.id"
+	return f.where(assignmentSelect) + " ORDER BY a.id", f.args
+}
+
+func (r *AssignmentRepo) List(ctx context.Context, filter domain.AssignmentFilter) ([]*domain.Assignment, error) {
+	query, args := assignmentsListQuery(filter)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {

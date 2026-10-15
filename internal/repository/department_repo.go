@@ -65,24 +65,20 @@ func (r *DepartmentRepo) ListInactive(ctx context.Context, filter domain.Departm
 	return r.list(ctx, false, filter)
 }
 
+// departmentsListQuery собирает SELECT списка подразделений (чистая функция —
+// тестируется без БД). Границы дат сравниваются по дню и включительно.
+func departmentsListQuery(active bool, filter domain.DepartmentFilter) (string, []any) {
+	var f filterBuilder
+	f.add("is_active = $%d", active)
+	f.ilike("name", filter.Name)
+	f.dateRange("created_at", filter.CreatedAtFrom, filter.CreatedAtTo)
+	return f.where("SELECT "+departmentColumns+" FROM departments") + " ORDER BY code", f.args
+}
+
 // list загружает подразделения с фильтром по активности и пользовательским
 // фильтром, отсортированные по коду.
 func (r *DepartmentRepo) list(ctx context.Context, active bool, filter domain.DepartmentFilter) ([]*domain.Department, error) {
-	query := `SELECT ` + departmentColumns + ` FROM departments WHERE is_active = $1`
-	args := []any{active}
-	if filter.Name != nil {
-		args = append(args, *filter.Name)
-		query += fmt.Sprintf(" AND name ILIKE '%%' || $%d || '%%'", len(args))
-	}
-	if filter.CreatedAtFrom != nil {
-		args = append(args, *filter.CreatedAtFrom)
-		query += fmt.Sprintf(" AND created_at >= $%d", len(args))
-	}
-	if filter.CreatedAtTo != nil {
-		args = append(args, *filter.CreatedAtTo)
-		query += fmt.Sprintf(" AND created_at <= $%d", len(args))
-	}
-	query += " ORDER BY code"
+	query, args := departmentsListQuery(active, filter)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
