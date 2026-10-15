@@ -49,6 +49,10 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	equipmentSvc := service.NewEquipmentService(equipmentRepo)
 	equipments := handlers.NewEquipmentHandler(equipmentSvc, log)
 
+	assignmentRepo := repository.NewAssignmentRepo(pool)
+	assignmentSvc := service.NewAssignmentService(assignmentRepo)
+	assignments := handlers.NewAssignmentHandler(assignmentSvc, log)
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// Статические маршруты /cards/inactive и /departments/inactive объявлены
 		// ДО параметрических /{number} и /{code}, иначе chi перехватил бы
@@ -93,6 +97,14 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 		r.Get("/equipments/{id}", equipments.GetByID)
 		r.Patch("/equipments/{id}", equipments.UpdateByID)
 		r.Delete("/equipments/{id}", equipments.DeleteByID)
+
+		// Закрепления оборудования (история перемещений).
+		r.Get("/assignments", assignments.List)
+		r.Post("/assignments", assignments.Create)
+
+		r.Get("/assignments/{id}", assignments.Get)
+		r.Patch("/assignments/{id}", assignments.Update)
+		r.Delete("/assignments/{id}", assignments.Delete)
 	})
 
 	r.NotFound(handlers.NotFound)
