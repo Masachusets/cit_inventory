@@ -1,0 +1,48 @@
+package web
+
+// NavItem — пункт главной навигации (текст ссылки + путь).
+type NavItem struct {
+	// Title — отображаемое название пункта навигации.
+	Title string
+	// Href — путь ссылки, например "/ui/equipments".
+	Href string
+}
+
+// DefaultNav — пункты навигации основных разделов системы.
+func DefaultNav() []NavItem {
+	return []NavItem{
+		{Title: "Оборудование", Href: "/ui/equipments"},
+		{Title: "Карточки", Href: "/ui/cards"},
+		{Title: "Подразделения", Href: "/ui/departments"},
+		{Title: "Номенклатура", Href: "/ui/nomenclatures"},
+		{Title: "Накладные", Href: "/ui/waybills"},
+	}
+}
+
+// Layout — базовый каркас страницы: <head> с CSS и htmx, шапка с навигацией
+// и <main> для содержимого. Дочерние шаблоны передают тело страницы.
+templ Layout(title string, nav []NavItem) {
+	<!DOCTYPE html>
+	<html lang="ru">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } · CIT Inventory</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<script src="/static/htmx.min.js" defer></script>
+		</head>
+		<body>
+			<header class="site-header">
+				<a class="brand" href="/">CIT Inventory</a>
+				<nav aria-label="Основная навигация">
+					for _, item := range nav {
+						<a href={ templ.SafeURL(item.Href) }>{ item.Title }</a>
+					}
+				</nav>
+			</header>
+			<main id="content">
+				{ children... }
+			</main>
+		</body>
+	</html>
+}

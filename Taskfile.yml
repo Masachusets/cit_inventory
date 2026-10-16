@@ -9,6 +9,9 @@ vars:
   SERVER_PKG: ./cmd/server
   IMPORT_PKG: ./cmd/import
   MIGRATIONS_DIR: migrations
+  # Путь к CLI templ (сначала PATH, затем ~/go/bin)
+  TEMPL:
+    sh: command -v templ >/dev/null 2>&1 && echo templ || echo $HOME/go/bin/templ
   # Локация бинаря goose: сначала PATH, затем ~/go/bin
   GOOSE:
     sh: command -v goose >/dev/null 2>&1 && echo goose || echo $HOME/go/bin/goose
@@ -51,6 +54,7 @@ tasks:
 
   build:
     desc: Собрать бинарники в bin/
+    deps: [templ:generate]
     cmds:
       - mkdir -p {{.BIN_DIR}}
       - go build -o {{.BIN_DIR}}/server {{.SERVER_PKG}}
@@ -58,21 +62,38 @@ tasks:
 
   test:
     desc: Запуск тестов
+    deps: [templ:generate]
     cmd: go test ./...
 
   cover:
     desc: Покрытие тестов (coverage.out + сводка)
+    deps: [templ:generate]
     cmds:
       - go test -coverprofile=coverage.out ./...
       - go tool cover -func=coverage.out
 
   vet:
     desc: Статический анализ (go vet)
+    deps: [templ:generate]
     cmd: go vet ./...
 
+  templ:generate:
+    desc: Сгенерировать Go-код из *.templ (templ generate)
+    cmd: '{{.TEMPL}} generate'
+
+  templ:watch:
+    desc: Следить за *.templ и перегенерировать код при изменениях
+    cmd: '{{.TEMPL}} generate --watch'
+
+  templ:fmt:
+    desc: Форматирование *.templ (templ fmt -w)
+    cmd: '{{.TEMPL}} fmt -w .'
+
   fmt:
-    desc: Форматирование кода (gofmt -w)
-    cmd: gofmt -w cmd internal pkg
+    desc: Форматирование кода (gofmt -w + templ fmt -w)
+    cmds:
+      - gofmt -w cmd internal pkg
+      - '{{.TEMPL}} fmt -w .'
 
   fmt:check:
     desc: Проверка форматирования кода (без изменений)
@@ -83,9 +104,11 @@ tasks:
         echo "$out" >&2
         exit 1
       fi
+      {{.TEMPL}} fmt --fail .
 
   lint:
     desc: Линтер (golangci-lint)
+    deps: [templ:generate]
     cmd: |
       found=""
       for bin in golangci-lint "$HOME/go/bin/golangci-lint-v2" "$HOME/go/bin/golangci-lint"; do
@@ -119,11 +142,12 @@ tasks:
     cmd: go mod tidy
 
   tools:
-    desc: Установка инструментов (task, golangci-lint, goose)
+    desc: Установка инструментов (task, golangci-lint, goose, templ)
     cmds:
       - go install github.com/go-task/task/v3/cmd/task@latest
       - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
       - go install github.com/pressly/goose/v3/cmd/goose@latest
+      - go install github.com/a-h/templ/cmd/templ@latest
 
   env:init:
     desc: Создать .env из .env.example (если отсутствует)
