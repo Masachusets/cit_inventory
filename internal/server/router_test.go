@@ -222,3 +222,117 @@ func TestNewRouter_CardsInvalidNumber(t *testing.T) {
 		t.Errorf("status = %d, want 400 (номер «abc» не число)", rr.Code)
 	}
 }
+
+// TestNewRouter_UIHome проверяет главную страницу веб-интерфейса: статус,
+// HTML-контент-тип и подключённый htmx.
+func TestNewRouter_UIHome(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/ui", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want text/html", ct)
+	}
+	for _, want := range []string{
+		"<title>Главная · CIT Inventory</title>",
+		`src="/static/htmx.min.js"`,
+		"Оборудование",
+	} {
+		if !strings.Contains(rr.Body.String(), want) {
+			t.Errorf("тело не содержит %q", want)
+		}
+	}
+}
+
+// TestNewRouter_UI404IsHTML проверяет, что несуществующий маршрут внутри /ui
+// отвечает HTML-страницей 404, а не JSON-ошибкой API.
+func TestNewRouter_UI404IsHTML(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/ui/no/such/page", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+	}
+	ct := rr.Header().Get("Content-Type")
+	if !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want text/html (внутри /ui — HTML-404)", ct)
+	}
+	if !strings.Contains(rr.Body.String(), "/ui/no/such/page") {
+		t.Errorf("тело не содержит запрошенный путь")
+	}
+}
+
+// TestNewRouter_Static проверяет раздачу статики из go:embed: htmx и CSS
+// доступны по /static/* с корректным контент-типом.
+func TestNewRouter_Static(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	tests := []struct {
+		path       string
+		wantStatus int
+		wantCT     string
+	}{
+		{"/static/htmx.min.js", http.StatusOK, "text/javascript"},
+		{"/static/app.css", http.StatusOK, "text/css"},
+		{"/static/no-such-file.js", http.StatusNotFound, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", rr.Code, tt.wantStatus)
+			}
+			if tt.wantCT != "" {
+				if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, tt.wantCT) {
+					t.Errorf("Content-Type = %q, want prefix %q", ct, tt.wantCT)
+				}
+			}
+		})
+	}
+}
+
+// TestNewRouter_RootRedirect проверяет, что корень перенаправляет в /ui.
+func TestNewRouter_RootRedirect(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusFound)
+	}
+	if loc := rr.Header().Get("Location"); loc != "/ui" {
+		t.Errorf("Location = %q, want %q", loc, "/ui")
+	}
+}
+
+// TestNewRouter_APINotFoundStillJSON защищает от регрессии: маршруты вне /ui
+// по-прежнему получают JSON-404 (API-совместимость не должна пострадать
+// от веб-интерфейса).
+func TestNewRouter_APINotFoundStillJSON(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/no/such/route", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+}

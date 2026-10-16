@@ -1,0 +1,30 @@
+package web
+
+// Home — главная страница веб-интерфейса: приветствие и разделы системы.
+templ Home() {
+	@Layout("Главная", DefaultNav()) {
+		<h1>CIT Inventory</h1>
+		<p class="lead">
+			Учёт оборудования: инвентарные номера, закрепление за сотрудниками и
+			подразделениями, накладные и номенклатура.
+		</p>
+		<section class="section-cards">
+			for _, item := range DefaultNav() {
+				<a class="section-card" href={ templ.SafeURL(item.Href) }>
+					<h2>{ item.Title }</h2>
+					<p class="muted">Раздел в разработке</p>
+				</a>
+			}
+		</section>
+	}
+}
+
+// PageNotFound — HTML-страница «маршрут не найден» внутри веб-интерфейса /ui
+// (в отличие от общего JSON NotFound роутера, обслуживающего API).
+templ PageNotFound(path string) {
+	@Layout("Страница не найдена", DefaultNav()) {
+		<h1>404 — страница не найдена</h1>
+		<p>Маршрут <code>{ path }</code> не существует или ещё не реализован.</p>
+		<p><a href="/ui">← На главную</a></p>
+	}
+}

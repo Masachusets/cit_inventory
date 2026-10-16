@@ -9,6 +9,7 @@ import (
 	"github.com/Masachusets/cit_inventory/internal/server/handlers"
 	"github.com/Masachusets/cit_inventory/internal/server/middleware"
 	"github.com/Masachusets/cit_inventory/internal/service"
+	"github.com/Masachusets/cit_inventory/internal/web"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,6 +26,21 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	health := handlers.NewHealthHandler(pool)
 	r.Get("/health/live", health.Live)
 	r.Get("/health/ready", health.Ready)
+
+	// Корень перенаправляет в веб-интерфейс; статика (htmx, CSS) — из go:embed.
+	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, "/ui", http.StatusFound)
+	})
+	r.Handle("/static/*", web.StaticHandler())
+
+	// Веб-интерфейс: серверный рендеринг (templ + htmx). Внутри группы —
+	// свой NotFound (HTML вместо JSON API); бизнес-слой подключится позже,
+	// когда появятся страницы разделов.
+	pages := handlers.NewPageHandler(log)
+	r.Route("/ui", func(r chi.Router) {
+		r.Get("/", pages.Home)
+		r.NotFound(pages.PageNotFound)
+	})
 
 	// Бизнес-слой: собираем цепочку зависимостей (composition root).
 	// pool может быть nil в тестах — репозиторий создаётся лениво, обращения
