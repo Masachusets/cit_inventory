@@ -1,0 +1,73 @@
+package web
+
+import "github.com/Masachusets/cit_inventory/internal/domain"
+
+// WaybillsFilterValues — значения полей фильтра списка накладных.
+type WaybillsFilterValues struct {
+	Name   string
+	Number string
+}
+
+// WaybillsTableData — данные таблицы накладных для рендера.
+type WaybillsTableData struct {
+	Items  []*domain.Waybill
+	Filter WaybillsFilterValues
+}
+
+// WaybillsListPage — страница раздела «Накладные»: фильтры по наименованию
+// и номеру, таблица (обновляется через htmx).
+templ WaybillsListPage(data WaybillsTableData) {
+	@Layout("Накладные", DefaultNav()) {
+		<div class="page-header">
+			<h1>Накладные</h1>
+		</div>
+		<form
+			id="waybills-filter"
+			class="filter-form"
+			hx-get="/ui/waybills"
+			hx-target="#waybills-table"
+			hx-swap="outerHTML"
+			hx-trigger="input changed delay:300ms, change, submit"
+		>
+			<label>
+				Наименование
+				<input type="text" name="name" value={ data.Filter.Name } placeholder="Товарная"/>
+			</label>
+			<label>
+				Номер
+				<input type="text" name="number" value={ data.Filter.Number } placeholder="123"/>
+			</label>
+			<a class="filter-reset" hx-get="/ui/waybills" hx-target="#waybills-table" hx-swap="outerHTML" href="/ui/waybills">Сбросить</a>
+		</form>
+		@WaybillsTable(data)
+	}
+}
+
+// WaybillsTable — фрагмент таблицы накладных (перезаписывается целиком).
+templ WaybillsTable(data WaybillsTableData) {
+	<div id="waybills-table">
+		if len(data.Items) == 0 {
+			<p class="empty">Накладные не найдены.</p>
+		} else {
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>Наименование</th>
+						<th>Номер</th>
+						<th>Дата</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, w := range data.Items {
+						<tr>
+							<td>{ w.Name }</td>
+							<td class="mono">{ optStr(w.Number) }</td>
+							<td>{ FormatDatePtr(w.IssueDate) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+		}
+	</div>
+}

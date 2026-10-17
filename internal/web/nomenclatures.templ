@@ -1,0 +1,71 @@
+package web
+
+import "github.com/Masachusets/cit_inventory/internal/domain"
+
+// NomenclaturesFilterValues — значения полей фильтра списка номенклатур.
+type NomenclaturesFilterValues struct {
+	Code string
+	Name string
+}
+
+// NomenclaturesTableData — данные таблицы номенклатур для рендера.
+type NomenclaturesTableData struct {
+	Items  []*domain.Nomenclature
+	Filter NomenclaturesFilterValues
+}
+
+// NomenclaturesListPage — страница раздела «Номенклатура»: фильтры по коду
+// и наименованию, таблица (обновляется через htmx).
+templ NomenclaturesListPage(data NomenclaturesTableData) {
+	@Layout("Номенклатура", DefaultNav()) {
+		<div class="page-header">
+			<h1>Номенклатура</h1>
+		</div>
+		<form
+			id="nomenclatures-filter"
+			class="filter-form"
+			hx-get="/ui/nomenclatures"
+			hx-target="#nomenclatures-table"
+			hx-swap="outerHTML"
+			hx-trigger="input changed delay:300ms, change, submit"
+		>
+			<label>
+				Код
+				<input type="text" name="code" value={ data.Filter.Code } placeholder="08.01"/>
+			</label>
+			<label>
+				Наименование
+				<input type="text" name="name" value={ data.Filter.Name } placeholder="Ноутбук"/>
+			</label>
+			<a class="filter-reset" hx-get="/ui/nomenclatures" hx-target="#nomenclatures-table" hx-swap="outerHTML" href="/ui/nomenclatures">Сбросить</a>
+		</form>
+		@NomenclaturesTable(data)
+	}
+}
+
+// NomenclaturesTable — фрагмент таблицы номенклатур (перезаписывается целиком).
+templ NomenclaturesTable(data NomenclaturesTableData) {
+	<div id="nomenclatures-table">
+		if len(data.Items) == 0 {
+			<p class="empty">Номенклатура не найдена.</p>
+		} else {
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>Код</th>
+						<th>Наименование</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, n := range data.Items {
+						<tr>
+							<td class="mono">{ n.Code }</td>
+							<td>{ n.Name }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+		}
+	</div>
+}

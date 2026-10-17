@@ -1,0 +1,68 @@
+package web
+
+import "github.com/Masachusets/cit_inventory/internal/domain"
+
+// DepartmentsFilterValues — значения полей фильтра списка подразделений.
+type DepartmentsFilterValues struct {
+	Name string
+}
+
+// DepartmentsTableData — данные таблицы подразделений для рендера.
+type DepartmentsTableData struct {
+	Items  []*domain.Department
+	Filter DepartmentsFilterValues
+}
+
+// DepartmentsListPage — страница раздела «Подразделения»: фильтр по
+// наименованию и таблица (обновляется через htmx).
+templ DepartmentsListPage(data DepartmentsTableData) {
+	@Layout("Подразделения", DefaultNav()) {
+		<div class="page-header">
+			<h1>Подразделения</h1>
+		</div>
+		<form
+			id="departments-filter"
+			class="filter-form"
+			hx-get="/ui/departments"
+			hx-target="#departments-table"
+			hx-swap="outerHTML"
+			hx-trigger="input changed delay:300ms, change, submit"
+		>
+			<label>
+				Наименование
+				<input type="text" name="name" value={ data.Filter.Name } placeholder="опк"/>
+			</label>
+			<a class="filter-reset" hx-get="/ui/departments" hx-target="#departments-table" hx-swap="outerHTML" href="/ui/departments">Сбросить</a>
+		</form>
+		@DepartmentsTable(data)
+	}
+}
+
+// DepartmentsTable — фрагмент таблицы подразделений (перезаписывается целиком).
+templ DepartmentsTable(data DepartmentsTableData) {
+	<div id="departments-table">
+		if len(data.Items) == 0 {
+			<p class="empty">Подразделения не найдены.</p>
+		} else {
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>Код</th>
+						<th>Наименование</th>
+						<th>Создано</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, d := range data.Items {
+						<tr>
+							<td class="mono">{ d.Code }</td>
+							<td>{ d.Name }</td>
+							<td>{ FormatDatePtr(&d.CreatedAt) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+		}
+	</div>
+}

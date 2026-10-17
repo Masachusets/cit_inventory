@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Masachusets/cit_inventory/internal/domain"
 	"github.com/Masachusets/cit_inventory/internal/service"
 	"github.com/Masachusets/cit_inventory/internal/web"
 	"github.com/a-h/templ"
@@ -14,15 +13,35 @@ import (
 
 // PageHandler — HTML-хендлеры веб-интерфейса (/ui): серверный рендеринг
 // templ-компонентов вместо JSON. Зависит от интерфейсов сервисов, поэтому
-// тестируется подменной реализацией.
+// тестируется подменной реализацией. Методы страниц разнесены по файлам:
+// pages_equipments.go, pages_cards.go, pages_departments.go,
+// pages_nomenclatures.go, pages_waybills.go.
 type PageHandler struct {
-	equipments service.EquipmentService
-	log        *slog.Logger
+	equipments    service.EquipmentService
+	cards         service.CardService
+	departments   service.DepartmentService
+	nomenclatures service.NomenclatureService
+	waybills      service.WaybillService
+	log           *slog.Logger
 }
 
 // NewPageHandler создаёт обработчик страниц веб-интерфейса.
-func NewPageHandler(equipments service.EquipmentService, log *slog.Logger) *PageHandler {
-	return &PageHandler{equipments: equipments, log: log}
+func NewPageHandler(
+	equipments service.EquipmentService,
+	cards service.CardService,
+	departments service.DepartmentService,
+	nomenclatures service.NomenclatureService,
+	waybills service.WaybillService,
+	log *slog.Logger,
+) *PageHandler {
+	return &PageHandler{
+		equipments:    equipments,
+		cards:         cards,
+		departments:   departments,
+		nomenclatures: nomenclatures,
+		waybills:      waybills,
+		log:           log,
+	}
 }
 
 // render пишет HTML-ответ компонента с заданным статусом.
@@ -39,6 +58,32 @@ func (h *PageHandler) render(w http.ResponseWriter, r *http.Request, status int,
 	}
 }
 
+// respondListError общая обработка ошибки сервиса при загрузке списка:
+// логирование + ответ 500 без утечки деталей. Возвращает true, если ошибка
+// была (вызывающий должен прекратить обработку).
+func (h *PageHandler) respondListError(w http.ResponseWriter, r *http.Request, op string, err error) bool {
+	if err == nil {
+		return false
+	}
+	h.log.Error(op,
+		"error", err,
+		"request_id", chimw.GetReqID(r.Context()))
+	http.Error(w, "internal server error", http.StatusInternalServerError)
+	return true
+}
+
+// isHXRequest определяет запрос от htmx: для него отдаётся только фрагмент
+// вместо полной страницы.
+func isHXRequest(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
+}
+
+// filterValue извлекает значение текстового поля фильтра из query с обрезкой
+// краевых пробелов; пустое/отсутствующее — "".
+func filterValue(r *http.Request, key string) string {
+	return strings.TrimSpace(r.URL.Query().Get(key))
+}
+
 // Home — GET /ui: главная страница со списком разделов.
 func (h *PageHandler) Home(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, web.Home())
@@ -47,71 +92,4 @@ func (h *PageHandler) Home(w http.ResponseWriter, r *http.Request) {
 // PageNotFound — HTML-404 внутри /ui: страница вместо JSON-ошибки API.
 func (h *PageHandler) PageNotFound(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusNotFound, web.PageNotFound(r.URL.Path))
-}
-
-// Equipments — GET /ui/equipments: список активного оборудования с фильтрацией.
-// Для обычного запроса — полная страница; для htmx (HX-Request: true) — только
-// фрагмент #equipment-table, подменяемый в DOM без перезагрузки.
-func (h *PageHandler) Equipments(w http.ResponseWriter, r *http.Request) {
-	values := parseEquipmentFilterValues(r)
-
-	items, err := h.equipments.ListActive(r.Context(), equipmentFilterFrom(values))
-	if err != nil {
-		h.log.Error("list equipments",
-			"error", err,
-			"request_id", chimw.GetReqID(r.Context()))
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	data := web.EquipmentTableData{Items: items, Filter: values}
-	if r.Header.Get("HX-Request") == "true" {
-		h.render(w, r, http.StatusOK, web.EquipmentTable(data))
-		return
-	}
-	h.render(w, r, http.StatusOK, web.EquipmentListPage(data))
-}
-
-// parseEquipmentFilterValues извлекает значения фильтра списка оборудования
-// из query-параметров формы /ui/equipments. Некорректный статус молча
-// игнорируется: в UI-форме статус — select только с валидными значениями.
-func parseEquipmentFilterValues(r *http.Request) web.EquipmentFilterValues {
-	q := r.URL.Query()
-	v := web.EquipmentFilterValues{
-		InventoryNumber: strings.TrimSpace(q.Get("inventory_number")),
-		ModelName:       strings.TrimSpace(q.Get("model_name")),
-		Location:        strings.TrimSpace(q.Get("location")),
-		CardFullName:    strings.TrimSpace(q.Get("card_full_name")),
-		DepartmentName:  strings.TrimSpace(q.Get("department_name")),
-	}
-	if st, err := domain.ParseEquipmentStatus(q.Get("status")); err == nil {
-		v.Status = string(st)
-	}
-	return v
-}
-
-// equipmentFilterFrom преобразует значения формы в доменный фильтр: пустая
-// строка — nil-поле (не фильтровать по полю).
-func equipmentFilterFrom(v web.EquipmentFilterValues) domain.EquipmentFilter {
-	var f domain.EquipmentFilter
-	if v.InventoryNumber != "" {
-		f.InventoryNumber = &v.InventoryNumber
-	}
-	if v.ModelName != "" {
-		f.ModelName = &v.ModelName
-	}
-	if v.Location != "" {
-		f.Location = &v.Location
-	}
-	if v.CardFullName != "" {
-		f.CardFullName = &v.CardFullName
-	}
-	if v.DepartmentName != "" {
-		f.DepartmentName = &v.DepartmentName
-	}
-	if v.Status != "" {
-		st := domain.EquipmentStatus(v.Status)
-		f.Status = &st
-	}
-	return f
 }

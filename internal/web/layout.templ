@@ -1,5 +1,7 @@
 package web
 
+import "time"
+
 // NavItem — пункт главной навигации (текст ссылки + путь).
 type NavItem struct {
 	// Title — отображаемое название пункта навигации.
@@ -17,6 +19,14 @@ func DefaultNav() []NavItem {
 		{Title: "Номенклатура", Href: "/ui/nomenclatures"},
 		{Title: "Накладные", Href: "/ui/waybills"},
 	}
+}
+
+// FormatDatePtr — дата → DD.MM.YYYY для таблиц; nil/нулевая → тире.
+func FormatDatePtr(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return "—"
+	}
+	return t.Format("02.01.2006")
 }
 
 // Layout — базовый каркас страницы: <head> с CSS и htmx, шапка с навигацией

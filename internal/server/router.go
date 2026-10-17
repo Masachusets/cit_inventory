@@ -61,12 +61,16 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	assignments := handlers.NewAssignmentHandler(assignmentSvc, log)
 
 	// Веб-интерфейс: серверный рендеринг (templ + htmx). Внутри группы —
-	// свой NotFound (HTML вместо JSON API). Страница оборудования зависит от
-	// equipmentSvc (создан выше в composition root).
-	pages := handlers.NewPageHandler(equipmentSvc, log)
+	// свой NotFound (HTML вместо JSON API). Страницы разделов зависят от
+	// сервисов, созданных выше в composition root.
+	pages := handlers.NewPageHandler(equipmentSvc, cardSvc, departmentSvc, nomenclatureSvc, waybillSvc, log)
 	r.Route("/ui", func(r chi.Router) {
 		r.Get("/", pages.Home)
 		r.Get("/equipments", pages.Equipments)
+		r.Get("/cards", pages.Cards)
+		r.Get("/departments", pages.Departments)
+		r.Get("/nomenclatures", pages.Nomenclatures)
+		r.Get("/waybills", pages.Waybills)
 		r.NotFound(pages.PageNotFound)
 	})
 

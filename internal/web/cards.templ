@@ -1,0 +1,68 @@
+package web
+
+import "github.com/Masachusets/cit_inventory/internal/domain"
+
+// CardsFilterValues — значения полей фильтра списка карточек.
+type CardsFilterValues struct {
+	FullName string
+}
+
+// CardsTableData — данные таблицы карточек для рендера.
+type CardsTableData struct {
+	Items  []*domain.Card
+	Filter CardsFilterValues
+}
+
+// CardsListPage — страница раздела «Карточки»: фильтр по ФИО и таблица
+// (обновляется через htmx без перезагрузки страницы).
+templ CardsListPage(data CardsTableData) {
+	@Layout("Карточки", DefaultNav()) {
+		<div class="page-header">
+			<h1>Карточки учёта</h1>
+		</div>
+		<form
+			id="cards-filter"
+			class="filter-form"
+			hx-get="/ui/cards"
+			hx-target="#cards-table"
+			hx-swap="outerHTML"
+			hx-trigger="input changed delay:300ms, change, submit"
+		>
+			<label>
+				ФИО
+				<input type="text" name="full_name" value={ data.Filter.FullName } placeholder="Иванов"/>
+			</label>
+			<a class="filter-reset" hx-get="/ui/cards" hx-target="#cards-table" hx-swap="outerHTML" href="/ui/cards">Сбросить</a>
+		</form>
+		@CardsTable(data)
+	}
+}
+
+// CardsTable — фрагмент таблицы карточек (перезаписывается целиком).
+templ CardsTable(data CardsTableData) {
+	<div id="cards-table">
+		if len(data.Items) == 0 {
+			<p class="empty">Карточки не найдены.</p>
+		} else {
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>№</th>
+						<th>ФИО</th>
+						<th>Создана</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, c := range data.Items {
+						<tr>
+							<td class="mono">{ c.Number }</td>
+							<td>{ c.FullName }</td>
+							<td>{ FormatDatePtr(&c.CreatedAt) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+		}
+	</div>
+}

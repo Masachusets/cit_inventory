@@ -236,6 +236,10 @@ func TestNewRouter_UIRoutes(t *testing.T) {
 		{http.MethodGet, "/ui"},
 		{http.MethodGet, "/ui/"},
 		{http.MethodGet, "/ui/equipments"},
+		{http.MethodGet, "/ui/cards"},
+		{http.MethodGet, "/ui/departments"},
+		{http.MethodGet, "/ui/nomenclatures"},
+		{http.MethodGet, "/ui/waybills"},
 	}
 
 	for _, tt := range tests {
