@@ -1,0 +1,172 @@
+package web
+
+import (
+	"time"
+
+	"github.com/Masachusets/cit_inventory/internal/domain"
+)
+
+// equipmentStatusLabels — человекочитаемые названия статусов оборудования.
+var equipmentStatusLabels = map[domain.EquipmentStatus]string{
+	domain.StatusExp:        "эксплуатируемое",
+	domain.StatusExpInt:     "эксплуатируемое (интернет)",
+	domain.StatusExpSp:      "эксплуатируемое (категорированное)",
+	domain.StatusBroken:     "неисправное",
+	domain.StatusWrittenOff: "списано",
+}
+
+// StatusLabel — человекочитаемое название статуса; неизвестное значение —
+// исходная строка (страховка от рассинхрона enum).
+func StatusLabel(s domain.EquipmentStatus) string {
+	if label, ok := equipmentStatusLabels[s]; ok {
+		return label
+	}
+	return string(s)
+}
+
+// EquipmentFilterValues — значения полей фильтра списка оборудования,
+// сохранённые в UI для обратного заполнения формы. Nil-поле = пусто.
+type EquipmentFilterValues struct {
+	InventoryNumber string
+	ModelName       string
+	Location        string
+	CardFullName    string
+	DepartmentName  string
+	Status          string // значение domain.EquipmentStatus либо пусто
+}
+
+// EquipmentTableData — данные таблицы оборудования для рендера.
+type EquipmentTableData struct {
+	Items  []*domain.Equipment
+	Filter EquipmentFilterValues
+}
+
+// EquipmentListPage — страница раздела «Оборудование»: форма фильтров и
+// таблица (обновляется через htmx без перезагрузки страницы).
+templ EquipmentListPage(data EquipmentTableData) {
+	@Layout("Оборудование", DefaultNav()) {
+		<div class="page-header">
+			<h1>Оборудование</h1>
+		</div>
+		@equipmentFilterForm(data.Filter)
+		@EquipmentTable(data)
+	}
+}
+
+// EquipmentTable — фрагмент таблицы оборудования (контейнер #equipment-table
+// перезаписывается целиком: и при полной загрузке страницы, и htmx-ответом).
+templ EquipmentTable(data EquipmentTableData) {
+	<div id="equipment-table">
+		if len(data.Items) == 0 {
+			<p class="empty">Оборудование не найдено.</p>
+		} else {
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>Инв. номер</th>
+						<th>Модель</th>
+						<th>Номенклатура</th>
+						<th>Статус</th>
+						<th>Ответственный</th>
+						<th>Подразделение</th>
+						<th>Место</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, eq := range data.Items {
+						<tr>
+							<td class="mono">{ eq.InventoryNumber }</td>
+							<td>{ optStr(eq.ModelName) }</td>
+							<td>{ optStr(eq.NomenclatureName) }</td>
+							<td>{ StatusLabel(eq.Status) }</td>
+							<td>{ optStr(eq.CardFullName) }</td>
+							<td>{ optStr(eq.DepartmentName) }</td>
+							<td>{ optStr(eq.Location) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+		}
+	</div>
+}
+
+// equipmentFilterForm — форма фильтрации: каждое поле через htmx подгружает
+// обновлённую таблицу с debounce (input changed delay:300ms) и по submit.
+templ equipmentFilterForm(v EquipmentFilterValues) {
+	<form
+		id="equipment-filter"
+		class="filter-form"
+		hx-get="/ui/equipments"
+		hx-target="#equipment-table"
+		hx-swap="outerHTML"
+		hx-trigger="input changed delay:300ms, change, submit"
+	>
+		<label>
+			Инв. номер
+			<input type="text" name="inventory_number" value={ v.InventoryNumber } placeholder="ИТ00042"/>
+		</label>
+		<label>
+			Модель
+			<input type="text" name="model_name" value={ v.ModelName } placeholder="Clevo"/>
+		</label>
+		<label>
+			Место
+			<input type="text" name="location" value={ v.Location } placeholder="кабинет"/>
+		</label>
+		<label>
+			Ответственный
+			<input type="text" name="card_full_name" value={ v.CardFullName } placeholder="Иванов"/>
+		</label>
+		<label>
+			Подразделение
+			<input type="text" name="department_name" value={ v.DepartmentName } placeholder="опк"/>
+		</label>
+		<label>
+			Статус
+			<select name="status">
+				if v.Status == "" {
+					<option value="" selected>— любой —</option>
+				} else {
+					<option value="">— любой —</option>
+				}
+				for _, s := range []domain.EquipmentStatus{
+					domain.StatusExp,
+					domain.StatusExpInt,
+					domain.StatusExpSp,
+					domain.StatusBroken,
+					domain.StatusWrittenOff,
+				} {
+					if v.Status == string(s) {
+						<option value={ string(s) } selected>{ StatusLabel(s) }</option>
+					} else {
+						<option value={ string(s) }>{ StatusLabel(s) }</option>
+					}
+				}
+			</select>
+		</label>
+		<a
+			class="filter-reset"
+			hx-get="/ui/equipments"
+			hx-target="#equipment-table"
+			hx-swap="outerHTML"
+			href="/ui/equipments"
+		>Сбросить</a>
+	</form>
+}
+
+// optStr — nil-строка → тире для визуального «нет значения».
+func optStr(v *string) string {
+	if v == nil || *v == "" {
+		return "—"
+	}
+	return *v
+}
+
+// formatDatePtr — дата → DD.MM.YYYY, nil/нулевая → тире.
+func formatDatePtr(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return "—"
+	}
+	return t.Format("02.01.2006")
+}

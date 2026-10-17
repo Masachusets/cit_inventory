@@ -33,15 +33,6 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	})
 	r.Handle("/static/*", web.StaticHandler())
 
-	// Веб-интерфейс: серверный рендеринг (templ + htmx). Внутри группы —
-	// свой NotFound (HTML вместо JSON API); бизнес-слой подключится позже,
-	// когда появятся страницы разделов.
-	pages := handlers.NewPageHandler(log)
-	r.Route("/ui", func(r chi.Router) {
-		r.Get("/", pages.Home)
-		r.NotFound(pages.PageNotFound)
-	})
-
 	// Бизнес-слой: собираем цепочку зависимостей (composition root).
 	// pool может быть nil в тестах — репозиторий создаётся лениво, обращения
 	// к БД в health-проверках и роутинге не происходят.
@@ -68,6 +59,16 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	assignmentRepo := repository.NewAssignmentRepo(pool)
 	assignmentSvc := service.NewAssignmentService(assignmentRepo)
 	assignments := handlers.NewAssignmentHandler(assignmentSvc, log)
+
+	// Веб-интерфейс: серверный рендеринг (templ + htmx). Внутри группы —
+	// свой NotFound (HTML вместо JSON API). Страница оборудования зависит от
+	// equipmentSvc (создан выше в composition root).
+	pages := handlers.NewPageHandler(equipmentSvc, log)
+	r.Route("/ui", func(r chi.Router) {
+		r.Get("/", pages.Home)
+		r.Get("/equipments", pages.Equipments)
+		r.NotFound(pages.PageNotFound)
+	})
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Статические маршруты /cards/inactive и /departments/inactive объявлены

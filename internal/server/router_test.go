@@ -223,6 +223,37 @@ func TestNewRouter_CardsInvalidNumber(t *testing.T) {
 	}
 }
 
+// TestNewRouter_UIRoutes проверяет регистрацию страниц веб-интерфейса:
+// маршрут должен существовать (не 404). Статус может быть 500 — в тестах
+// pool=nil и обращения к БД не происходят/падают, важен факт роутинга.
+func TestNewRouter_UIRoutes(t *testing.T) {
+	r := newTestRouter(t, nil, nil)
+
+	tests := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/ui"},
+		{http.MethodGet, "/ui/"},
+		{http.MethodGet, "/ui/equipments"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			if rr.Code == http.StatusNotFound && strings.HasPrefix(rr.Header().Get("Content-Type"), "text/html") {
+				t.Errorf("%s %s вернул HTML-404 — маршрут страницы не зарегистрирован", tt.method, tt.path)
+			}
+			if rr.Code == http.StatusMethodNotAllowed {
+				t.Errorf("метод %s не разрешён для %s", tt.method, tt.path)
+			}
+		})
+	}
+}
+
 // TestNewRouter_UIHome проверяет главную страницу веб-интерфейса: статус,
 // HTML-контент-тип и подключённый htmx.
 func TestNewRouter_UIHome(t *testing.T) {
