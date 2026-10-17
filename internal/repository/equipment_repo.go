@@ -167,33 +167,36 @@ func scanEquipmentList(row rowScanner) (*domain.Equipment, error) {
 }
 
 // equipmentsListQuery собирает SELECT списка оборудования (чистая функция —
-// тестируется без БД).
+// тестируется без БД). Все колонки в WHERE-условиях префиксируются таблицами
+// (e./n./a./c./d.): после LEFT JOIN-ов непрефиксированные имена неоднозначны
+// (например, deleted_at есть и у cards, и у departments), а алиасы SELECT
+// (nomenclature_code, assignment_*) в WHERE недоступны в PostgreSQL.
 func equipmentsListQuery(active bool, filter domain.EquipmentFilter) (string, []any) {
 	var f filterBuilder
 	if active {
-		f.cond("deleted_at IS NULL")
+		f.cond("e.deleted_at IS NULL")
 	} else {
-		f.cond("deleted_at IS NOT NULL")
+		f.cond("e.deleted_at IS NOT NULL")
 	}
-	f.ilike("inventory_number", filter.InventoryNumber)
-	f.ilike("serial_number", filter.SerialNumber)
-	f.ilike("model_name", filter.ModelName)
+	f.ilike("e.inventory_number", filter.InventoryNumber)
+	f.ilike("e.serial_number", filter.SerialNumber)
+	f.ilike("e.model_name", filter.ModelName)
 	if filter.Status != nil {
-		f.add("status = $%d::equipment_status", string(*filter.Status))
+		f.add("e.status = $%d::equipment_status", string(*filter.Status))
 	}
-	f.ilike("location", filter.Location)
+	f.ilike("e.location", filter.Location)
 	if filter.NomenclatureCode != nil {
-		f.add("nomenclature_code = $%d", *filter.NomenclatureCode)
+		f.add("n.code = $%d", *filter.NomenclatureCode)
 	}
-	f.ilike("nomenclature_name", filter.NomenclatureName)
+	f.ilike("n.name", filter.NomenclatureName)
 	if filter.CardNumber != nil {
-		f.add("assignment_card_number = $%d", *filter.CardNumber)
+		f.add("a.card_number = $%d", *filter.CardNumber)
 	}
-	f.ilike("assignment_card_full_name", filter.CardFullName)
+	f.ilike("c.full_name", filter.CardFullName)
 	if filter.DepartmentCode != nil {
-		f.add("assignment_department_code = $%d", *filter.DepartmentCode)
+		f.add("d.code = $%d", *filter.DepartmentCode)
 	}
-	f.ilike("assignment_department_name", filter.DepartmentName)
+	f.ilike("d.name", filter.DepartmentName)
 
 	query := `
         SELECT ` + listEquipmentColumns + `

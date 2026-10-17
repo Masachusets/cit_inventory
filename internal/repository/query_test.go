@@ -145,9 +145,11 @@ func TestEquipmentsListQuery(t *testing.T) {
 	// Регрессия: ILIKE-шаблон должен быть строковым литералом
 	// '%' || $n || '%' — иначе PostgreSQL падает с syntax error.
 	// cond без аргумента не сдвигает нумерацию: $1 — inventory_number.
-	wantConds := "deleted_at IS NULL" +
-		" AND inventory_number ILIKE '%' || $1 || '%'" +
-		" AND status = $2::equipment_status"
+	// Колонки префиксируются e.: после JOIN-ов непрефиксированный
+	// deleted_at неоднозначен (есть у cards и departments).
+	wantConds := "e.deleted_at IS NULL" +
+		" AND e.inventory_number ILIKE '%' || $1 || '%'" +
+		" AND e.status = $2::equipment_status"
 	if !strings.Contains(query, " WHERE "+wantConds) {
 		t.Errorf("query не содержит ожидаемых условий:\n%s\nхотели: %s", query, wantConds)
 	}
