@@ -50,6 +50,38 @@ func NewWaybill(name, number string, issueDate *time.Time) (*Waybill, error) {
 	return w, nil
 }
 
+// Update изменяет поля путевого листа. Валидирует наименование и номер,
+// пустые значения number/issueDate приводятся к nil (NULL в БД).
+func (w *Waybill) Update(name, number string, issueDate *time.Time) error {
+	name = normalizeName(name)
+	if name == "" {
+		return fmt.Errorf("%w: наименование не может быть пустым", ErrInvalidName)
+	}
+	if utf8.RuneCountInString(name) > maxWaybillNameLen {
+		return fmt.Errorf("%w: наименование длиннее %d символов", ErrInvalidName, maxWaybillNameLen)
+	}
+
+	w.Name = name
+
+	number = normalizeName(number)
+	if number != "" {
+		if utf8.RuneCountInString(number) > maxWaybillNumberLen {
+			return fmt.Errorf("%w: номер документа длиннее %d символов", ErrInvalidName, maxWaybillNumberLen)
+		}
+		w.Number = &number
+	} else {
+		w.Number = nil
+	}
+
+	if issueDate != nil {
+		d := issueDate.Truncate(24 * time.Hour)
+		w.IssueDate = &d
+	} else {
+		w.IssueDate = nil
+	}
+	return nil
+}
+
 // WaybillFilter — параметры фильтрации списка путевых листов (все поля,
 // кроме PK). nil-поле означает «не фильтровать». Границы issue_date —
 // включительные (>= / <=); записи с NULL-датой при заданной границе

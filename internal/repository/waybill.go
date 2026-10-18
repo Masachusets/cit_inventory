@@ -19,4 +19,7 @@ type WaybillRepository interface {
 	List(ctx context.Context, filter domain.WaybillFilter) ([]*domain.Waybill, error)
 	// ExistsByNumber сообщает, есть ли путевой лист с таким номером.
 	ExistsByNumber(ctx context.Context, number string) (bool, error)
+	// Update обновляет путевой лист по идентификатору.
+	// При существующем номере (UNIQUE) — domain.ErrAlreadyExists.
+	Update(ctx context.Context, id int, wb *domain.Waybill) error
 }

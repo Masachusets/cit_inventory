@@ -1,6 +1,10 @@
 package web
 
-import "github.com/Masachusets/cit_inventory/internal/domain"
+import (
+	"strconv"
+
+	"github.com/Masachusets/cit_inventory/internal/domain"
+)
 
 // CardsFilterValues — значения полей фильтра списка карточек.
 type CardsFilterValues struct {
@@ -13,12 +17,111 @@ type CardsTableData struct {
 	Filter CardsFilterValues
 }
 
+// CardModalData — данные модальной формы карточки.
+type CardModalData struct {
+	Number    int
+	FullName  string
+	Error     string
+	ActionURL string
+}
+
+// CardCreateModal — модальное окно создания карточки учёта.
+templ CardCreateModal(data CardModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+			hx-on:click="this.closest('.modal').remove()"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Новая карточка учёта</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#cards-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<div class="form-group">
+							<label class="form-label">Номер карточки</label>
+							<input type="number" name="number" value={ data.Number } min="1" required class="form-input"/>
+						</div>
+						<div class="form-group">
+							<label class="form-label">ФИО ответственного</label>
+							<input type="text" name="full_name" value={ data.FullName } maxlength="150" placeholder="Иванов Иван Иванович" required class="form-input"/>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// CardEditModal — модальное окно редактирования карточки учёта.
+templ CardEditModal(data CardModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+			hx-on:click="this.closest('.modal').remove()"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Редактирование карточки №{ data.Number }</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#cards-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<input type="hidden" name="number" value={ data.Number }/>
+						<div class="form-group">
+							<label class="form-label">Номер карточки</label>
+							<input type="number" name="number" value={ data.Number } min="1" readonly class="form-input"/>
+							<span class="form-hint">Номер нельзя изменить.</span>
+						</div>
+						<div class="form-group">
+							<label class="form-label">ФИО ответственного</label>
+							<input type="text" name="full_name" value={ data.FullName } maxlength="150" placeholder="Иванов Иван Иванович" required class="form-input"/>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
 // CardsListPage — страница раздела «Карточки»: фильтр по ФИО и таблица
 // (обновляется через htmx без перезагрузки страницы).
 templ CardsListPage(data CardsTableData) {
 	@Layout("Карточки", DefaultNav()) {
 		<div class="page-header">
 			<h1>Карточки учёта</h1>
+			<div class="page-actions">
+				<button class="btn btn-primary" hx-get="/ui/cards/create" hx-target="#cards-modal" hx-swap="innerHTML">Добавить карточку</button>
+			</div>
 		</div>
 		<form
 			id="cards-filter"
@@ -35,6 +138,7 @@ templ CardsListPage(data CardsTableData) {
 			<a class="filter-reset" hx-get="/ui/cards" hx-target="#cards-table" hx-swap="outerHTML" href="/ui/cards">Сбросить</a>
 		</form>
 		@CardsTable(data)
+		<div id="cards-modal"></div>
 	}
 }
 
@@ -50,6 +154,7 @@ templ CardsTable(data CardsTableData) {
 						<th>№</th>
 						<th>ФИО</th>
 						<th>Создана</th>
+						<th class="actions-cell">Действия</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -58,6 +163,9 @@ templ CardsTable(data CardsTableData) {
 							<td class="mono">{ c.Number }</td>
 							<td>{ c.FullName }</td>
 							<td>{ FormatDatePtr(&c.CreatedAt) }</td>
+							<td class="actions-cell">
+								<button class="action-btn" hx-get={ templ.SafeURL("/ui/cards/" + strconv.Itoa(c.Number) + "/edit") } hx-target="#cards-modal" hx-swap="innerHTML">Редактировать</button>
+							</td>
 						</tr>
 					}
 				</tbody>

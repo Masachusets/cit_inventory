@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/Masachusets/cit_inventory/internal/domain"
 	"github.com/Masachusets/cit_inventory/internal/service"
 	"github.com/Masachusets/cit_inventory/internal/web"
 	"github.com/a-h/templ"
@@ -82,6 +84,30 @@ func isHXRequest(r *http.Request) bool {
 // краевых пробелов; пустое/отсутствующее — "".
 func filterValue(r *http.Request, key string) string {
 	return strings.TrimSpace(r.URL.Query().Get(key))
+}
+
+// domainErrorMessage маппит доменные ошибки на пользовательские сообщения.
+func domainErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		return "Запись не найдена."
+	case errors.Is(err, domain.ErrAlreadyExists):
+		return "Запись с таким значением уже существует."
+	case errors.Is(err, domain.ErrInvalidNumber):
+		return "Некорректный номер записи."
+	case errors.Is(err, domain.ErrInvalidName):
+		return "Некорректное наименование."
+	case errors.Is(err, domain.ErrInvalidCode):
+		return "Некорректный код подразделения."
+	case errors.Is(err, domain.ErrStillActive):
+		return "Нельзя выполнить действие над активной записью."
+	case errors.Is(err, domain.ErrInUse):
+		return "Запись используется другим оборудованием."
+	case errors.Is(err, domain.ErrInvalidID):
+		return "Некорректный идентификатор."
+	default:
+		return "Внутренняя ошибка сервера."
+	}
 }
 
 // Home — GET /ui: главная страница со списком разделов.

@@ -67,10 +67,31 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	r.Route("/ui", func(r chi.Router) {
 		r.Get("/", pages.Home)
 		r.Get("/equipments", pages.Equipments)
+
+		// Карточки. Статические маршруты create/edit объявлены ДО параметрических
+		// /cards/{number}, иначе chi перехватит "create"/"edit" как {number}.
+		r.Get("/cards/create", pages.CardsCreate)
+		r.Post("/cards/create", pages.CardsCreateSubmit)
+		r.Get("/cards/{number}/edit", pages.CardsEdit)
+		r.Post("/cards/{number}", pages.CardsUpdateSubmit)
 		r.Get("/cards", pages.Cards)
+
+		// Подразделения. Статические маршруты create/edit ДО /departments/{code}.
+		r.Get("/departments/create", pages.DepartmentsCreate)
+		r.Post("/departments/create", pages.DepartmentsCreateSubmit)
+		r.Get("/departments/{code}/edit", pages.DepartmentsEdit)
+		r.Post("/departments/{code}", pages.DepartmentsUpdateSubmit)
 		r.Get("/departments", pages.Departments)
+
 		r.Get("/nomenclatures", pages.Nomenclatures)
+
+		// Накладные. Статические маршруты create/edit ДО /waybills/{id}.
+		r.Get("/waybills/create", pages.WaybillsCreate)
+		r.Post("/waybills/create", pages.WaybillsCreateSubmit)
+		r.Get("/waybills/{id}/edit", pages.WaybillsEdit)
+		r.Post("/waybills/{id}", pages.WaybillsUpdateSubmit)
 		r.Get("/waybills", pages.Waybills)
+
 		r.NotFound(pages.PageNotFound)
 	})
 
@@ -102,6 +123,7 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 		r.Post("/waybills", waybills.Create)
 
 		r.Get("/waybills/{id}", waybills.Get)
+		r.Patch("/waybills/{id}", waybills.Update)
 
 		// Оборудование. Статические маршруты /equipments/inactive и
 		// /equipments/inventory/{inventory_number} объявлены ДО параметрических

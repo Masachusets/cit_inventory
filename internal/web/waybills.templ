@@ -1,6 +1,10 @@
 package web
 
-import "github.com/Masachusets/cit_inventory/internal/domain"
+import (
+	"strconv"
+
+	"github.com/Masachusets/cit_inventory/internal/domain"
+)
 
 // WaybillsFilterValues — значения полей фильтра списка накладных.
 type WaybillsFilterValues struct {
@@ -14,12 +18,120 @@ type WaybillsTableData struct {
 	Filter WaybillsFilterValues
 }
 
+// WaybillModalData — данные модальной формы накладной.
+type WaybillModalData struct {
+	ID        int
+	Name      string
+	Number    string
+	IssueDate string
+	Error     string
+	ActionURL string
+}
+
+// WaybillCreateModal — модальное окно создания накладной.
+templ WaybillCreateModal(data WaybillModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+			hx-on:click="this.closest('.modal').remove()"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Новая накладная</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#waybills-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<div class="form-group">
+							<label class="form-label">Наименование</label>
+							<input type="text" name="name" value={ data.Name } maxlength="50" placeholder="Путевой лист" required class="form-input"/>
+						</div>
+						<div class="form-group">
+							<label class="form-label">Номер документа</label>
+							<input type="text" name="number" value={ data.Number } maxlength="50" placeholder="123/2026" class="form-input"/>
+						</div>
+						<div class="form-group">
+							<label class="form-label">Дата документа</label>
+							<input type="date" name="issue_date" value={ data.IssueDate } class="form-input"/>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// WaybillEditModal — модальное окно редактирования накладной.
+templ WaybillEditModal(data WaybillModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+			hx-on:click="this.closest('.modal').remove()"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Редактирование накладной №{ data.ID }</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#waybills-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<input type="hidden" name="id" value={ data.ID }/>
+						<div class="form-group">
+							<label class="form-label">Наименование</label>
+							<input type="text" name="name" value={ data.Name } maxlength="50" placeholder="Путевой лист" required class="form-input"/>
+						</div>
+						<div class="form-group">
+							<label class="form-label">Номер документа</label>
+							<input type="text" name="number" value={ data.Number } maxlength="50" placeholder="123/2026" class="form-input"/>
+						</div>
+						<div class="form-group">
+							<label class="form-label">Дата документа</label>
+							<input type="date" name="issue_date" value={ data.IssueDate } class="form-input"/>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
 // WaybillsListPage — страница раздела «Накладные»: фильтры по наименованию
 // и номеру, таблица (обновляется через htmx).
 templ WaybillsListPage(data WaybillsTableData) {
 	@Layout("Накладные", DefaultNav()) {
 		<div class="page-header">
 			<h1>Накладные</h1>
+			<div class="page-actions">
+				<button class="btn btn-primary" hx-get="/ui/waybills/create" hx-target="#waybills-modal" hx-swap="innerHTML">Добавить накладную</button>
+			</div>
 		</div>
 		<form
 			id="waybills-filter"
@@ -40,6 +152,7 @@ templ WaybillsListPage(data WaybillsTableData) {
 			<a class="filter-reset" hx-get="/ui/waybills" hx-target="#waybills-table" hx-swap="outerHTML" href="/ui/waybills">Сбросить</a>
 		</form>
 		@WaybillsTable(data)
+		<div id="waybills-modal"></div>
 	}
 }
 
@@ -55,6 +168,7 @@ templ WaybillsTable(data WaybillsTableData) {
 						<th>Наименование</th>
 						<th>Номер</th>
 						<th>Дата</th>
+						<th class="actions-cell">Действия</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -63,6 +177,9 @@ templ WaybillsTable(data WaybillsTableData) {
 							<td>{ w.Name }</td>
 							<td class="mono">{ optStr(w.Number) }</td>
 							<td>{ FormatDatePtr(w.IssueDate) }</td>
+							<td class="actions-cell">
+								<button class="action-btn" hx-get={ templ.SafeURL("/ui/waybills/" + strconv.Itoa(w.ID) + "/edit") } hx-target="#waybills-modal" hx-swap="innerHTML">Редактировать</button>
+							</td>
 						</tr>
 					}
 				</tbody>

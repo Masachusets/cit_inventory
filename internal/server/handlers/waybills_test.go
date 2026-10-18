@@ -21,11 +21,14 @@ type stubWaybillService struct {
 	getErr       error
 	listItems    []*domain.Waybill
 	listErr      error
+	updateResult *domain.Waybill
+	updateErr    error
 
 	lastFilter   domain.WaybillFilter
 	lastName     string
 	lastNumber   string
 	lastIssueNil bool // Create получил nil-дату
+	lastUpdateID int  // Update получил этот id
 }
 
 func (s *stubWaybillService) Create(_ context.Context, name, number string, issueDate *time.Time) (*domain.Waybill, error) {
@@ -42,6 +45,13 @@ func (s *stubWaybillService) Get(_ context.Context, _ int) (*domain.Waybill, err
 func (s *stubWaybillService) List(_ context.Context, filter domain.WaybillFilter) ([]*domain.Waybill, error) {
 	s.lastFilter = filter
 	return s.listItems, s.listErr
+}
+
+func (s *stubWaybillService) Update(_ context.Context, id int, name, number string, issueDate *time.Time) (*domain.Waybill, error) {
+	s.lastUpdateID = id
+	s.lastName = name
+	s.lastNumber = number
+	return s.updateResult, s.updateErr
 }
 
 // reqWithID определён в nomenclatures_test.go (общий пакет handlers).

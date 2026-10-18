@@ -177,3 +177,244 @@ main#content {
   margin: 0 auto;
   padding: 1.5rem;
 }
+
+/* --- Модальные окна --- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  cursor: grab;
+}
+
+.modal-header:active,
+.modal-header[draggable="true"] {
+  cursor: grabbing;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.modal-close:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+.modal-body {
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* --- Формы --- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.form-input,
+.form-select {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  ring: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.form-input[readonly] {
+  background: var(--color-bg-subtle);
+  color: var(--color-muted);
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.form-error-global {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  color: #991b1b;
+  font-size: 0.85rem;
+}
+
+.form-error-global:empty {
+  display: none;
+}
+
+.form-error {
+  color: #991b1b;
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.form-input.error,
+.form-select.error {
+  border-color: #991b1b;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+/* --- Кнопки --- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-weight: 500;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--color-accent);
+}
+
+.btn:focus-visible {
+  outline: none;
+  ring: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.btn-primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+/* --- Кнопки действий в таблице --- */
+
+.actions-cell {
+  white-space: nowrap;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.action-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* --- Заголовок страницы с кнопкой добавления --- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.page-header .page-actions {
+  display: flex;
+  gap: 0.5rem;
+}

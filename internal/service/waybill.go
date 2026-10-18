@@ -19,6 +19,8 @@ type WaybillService interface {
 	Get(ctx context.Context, id int) (*domain.Waybill, error)
 	// List возвращает путевые листы, отфильтрованные по заданным полям.
 	List(ctx context.Context, filter domain.WaybillFilter) ([]*domain.Waybill, error)
+	// Update обновляет путевой лист по id. При существующем номере — domain.ErrAlreadyExists.
+	Update(ctx context.Context, id int, name, number string, issueDate *time.Time) (*domain.Waybill, error)
 }
 
 // WaybillServiceImpl — реализация WaybillService поверх WaybillRepository.
@@ -66,4 +68,36 @@ func (s *WaybillServiceImpl) Get(ctx context.Context, id int) (*domain.Waybill, 
 
 func (s *WaybillServiceImpl) List(ctx context.Context, filter domain.WaybillFilter) ([]*domain.Waybill, error) {
 	return s.repo.List(ctx, filter)
+}
+
+// Update обновляет путевой лист по id.
+func (s *WaybillServiceImpl) Update(ctx context.Context, id int, name, number string, issueDate *time.Time) (*domain.Waybill, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: id %d должен быть положительным", domain.ErrInvalidID, id)
+	}
+
+	wb, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := wb.Update(name, number, issueDate); err != nil {
+		return nil, err
+	}
+
+	// Проверка дубля номера (если номер задан).
+	if wb.Number != nil {
+		exists, err := s.repo.ExistsByNumber(ctx, *wb.Number)
+		if err != nil {
+			return nil, fmt.Errorf("check waybill %q exists: %w", *wb.Number, err)
+		}
+		if exists {
+			return nil, fmt.Errorf("%w: номер %q", domain.ErrAlreadyExists, *wb.Number)
+		}
+	}
+
+	if err := s.repo.Update(ctx, id, wb); err != nil {
+		return nil, err
+	}
+	return wb, nil
 }

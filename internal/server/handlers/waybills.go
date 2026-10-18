@@ -143,8 +143,47 @@ func (h *WaybillHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, toWaybillResponse(wb))
 }
 
-// parseID извлекает идентификатор из пути и валидирует его.
-// При ошибке записывает ответ 400 и возвращает ok=false.
+// updateWaybillRequest — тело PATCH /api/v1/waybills/{id}.
+type updateWaybillRequest struct {
+	Name      string  `json:"name"`
+	Number    *string `json:"number"`
+	IssueDate *string `json:"issue_date"`
+}
+
+// Update обрабатывает PATCH /api/v1/waybills/{id}.
+func (h *WaybillHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.parseID(w, r)
+	if !ok {
+		return
+	}
+
+	var req updateWaybillRequest
+	if err := decodeJSON(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	var issueDate *time.Time
+	if req.IssueDate != nil && *req.IssueDate != "" {
+		d, err := time.Parse(dateFormat, *req.IssueDate)
+		if err != nil {
+			respondError(w, r, http.StatusBadRequest, "invalid issue_date, want YYYY-MM-DD")
+			return
+		}
+		issueDate = &d
+	} else if req.IssueDate != nil && *req.IssueDate == "" {
+		// пустая строка — очистить дату (передаём нулевое время как сигнал)
+		zero := time.Time{}
+		issueDate = &zero
+	}
+
+	wb, err := h.svc.Update(r.Context(), id, req.Name, derefReqString(req.Number), issueDate)
+	if err != nil {
+		h.respondDomainError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, toWaybillResponse(wb))
+}
 func (h *WaybillHandler) parseID(w http.ResponseWriter, r *http.Request) (int, bool) {
 	raw := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(raw)

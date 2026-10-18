@@ -1,6 +1,10 @@
 package web
 
-import "github.com/Masachusets/cit_inventory/internal/domain"
+import (
+	"strconv"
+
+	"github.com/Masachusets/cit_inventory/internal/domain"
+)
 
 // DepartmentsFilterValues — значения полей фильтра списка подразделений.
 type DepartmentsFilterValues struct {
@@ -13,12 +17,111 @@ type DepartmentsTableData struct {
 	Filter DepartmentsFilterValues
 }
 
+// DepartmentModalData — данные модальной формы подразделения.
+type DepartmentModalData struct {
+	Code      int
+	Name      string
+	Error     string
+	ActionURL string
+}
+
+// DepartmentCreateModal — модальное окно создания подразделения.
+templ DepartmentCreateModal(data DepartmentModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+			hx-on:click="this.closest('.modal').remove()"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Новое подразделение</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#departments-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<div class="form-group">
+							<label class="form-label">Код подразделения</label>
+							<input type="number" name="code" value={ data.Code } min="1" required class="form-input"/>
+						</div>
+						<div class="form-group">
+							<label class="form-label">Наименование</label>
+							<input type="text" name="name" value={ data.Name } maxlength="150" placeholder="опк Гомель" required class="form-input"/>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// DepartmentEditModal — модальное окно редактирования подразделения.
+templ DepartmentEditModal(data DepartmentModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+			hx-on:click="this.closest('.modal').remove()"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Редактирование подразделения { data.Code }</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#departments-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<input type="hidden" name="code" value={ data.Code }/>
+						<div class="form-group">
+							<label class="form-label">Код подразделения</label>
+							<input type="number" name="code" value={ data.Code } min="1" readonly class="form-input"/>
+							<span class="form-hint">Код нельзя изменить.</span>
+						</div>
+						<div class="form-group">
+							<label class="form-label">Наименование</label>
+							<input type="text" name="name" value={ data.Name } maxlength="150" placeholder="опк Гомель" required class="form-input"/>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
 // DepartmentsListPage — страница раздела «Подразделения»: фильтр по
 // наименованию и таблица (обновляется через htmx).
 templ DepartmentsListPage(data DepartmentsTableData) {
 	@Layout("Подразделения", DefaultNav()) {
 		<div class="page-header">
 			<h1>Подразделения</h1>
+			<div class="page-actions">
+				<button class="btn btn-primary" hx-get="/ui/departments/create" hx-target="#departments-modal" hx-swap="innerHTML">Добавить подразделение</button>
+			</div>
 		</div>
 		<form
 			id="departments-filter"
@@ -35,6 +138,7 @@ templ DepartmentsListPage(data DepartmentsTableData) {
 			<a class="filter-reset" hx-get="/ui/departments" hx-target="#departments-table" hx-swap="outerHTML" href="/ui/departments">Сбросить</a>
 		</form>
 		@DepartmentsTable(data)
+		<div id="departments-modal"></div>
 	}
 }
 
@@ -50,6 +154,7 @@ templ DepartmentsTable(data DepartmentsTableData) {
 						<th>Код</th>
 						<th>Наименование</th>
 						<th>Создано</th>
+						<th class="actions-cell">Действия</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -58,6 +163,9 @@ templ DepartmentsTable(data DepartmentsTableData) {
 							<td class="mono">{ d.Code }</td>
 							<td>{ d.Name }</td>
 							<td>{ FormatDatePtr(&d.CreatedAt) }</td>
+							<td class="actions-cell">
+								<button class="action-btn" hx-get={ templ.SafeURL("/ui/departments/" + strconv.Itoa(int(d.Code)) + "/edit") } hx-target="#departments-modal" hx-swap="innerHTML">Редактировать</button>
+							</td>
 						</tr>
 					}
 				</tbody>

@@ -102,6 +102,25 @@ func (r *WaybillRepo) ExistsByNumber(ctx context.Context, number string) (bool, 
 	return exists, nil
 }
 
+// Update обновляет путевой лист по идентификатору.
+// При нарушении UNIQUE на номере — domain.ErrAlreadyExists.
+func (r *WaybillRepo) Update(ctx context.Context, id int, wb *domain.Waybill) error {
+	_, err := r.pool.Exec(ctx, `
+        UPDATE waybills
+        SET name = $1, number = $2, issue_date = $3
+        WHERE id = $4`,
+		wb.Name, wb.Number, wb.IssueDate, id,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			return fmt.Errorf("%w: номер %v", domain.ErrAlreadyExists, derefString(wb.Number))
+		}
+		return fmt.Errorf("update waybill %d: %w", id, err)
+	}
+	return nil
+}
+
 // scanWaybill читает одну строку waybills в доменную модель.
 func scanWaybill(row rowScanner) (*domain.Waybill, error) {
 	var wb domain.Waybill

@@ -75,6 +75,14 @@ func (f *fakeWaybillRepo) ExistsByNumber(_ context.Context, number string) (bool
 	return false, nil
 }
 
+func (f *fakeWaybillRepo) Update(_ context.Context, id int, wb *domain.Waybill) error {
+	if _, ok := f.items[id]; !ok {
+		return domain.ErrNotFound
+	}
+	f.items[id] = wb
+	return nil
+}
+
 func TestWaybillService_Create(t *testing.T) {
 	svc := NewWaybillService(newFakeWaybillRepo())
 	num := "123/2026"
