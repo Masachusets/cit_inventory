@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
@@ -57,37 +58,47 @@ templ EquipmentListPage(data EquipmentTableData) {
 // перезаписывается целиком: и при полной загрузке страницы, и htmx-ответом).
 templ EquipmentTable(data EquipmentTableData) {
 	<div id="equipment-table">
-		if len(data.Items) == 0 {
-			<p class="empty">Оборудование не найдено.</p>
-		} else {
-			<table class="data-table">
-				<thead>
-					<tr>
-						<th>Инв. номер</th>
-						<th>Модель</th>
-						<th>Номенклатура</th>
-						<th>Статус</th>
-						<th>Ответственный</th>
-						<th>Подразделение</th>
-						<th>Место</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, eq := range data.Items {
-						<tr>
-							<td class="mono">{ eq.InventoryNumber }</td>
-							<td>{ optStr(eq.ModelName) }</td>
-							<td>{ optStr(eq.NomenclatureName) }</td>
-							<td>{ StatusLabel(eq.Status) }</td>
-							<td>{ optStr(eq.CardFullName) }</td>
-							<td>{ optStr(eq.DepartmentName) }</td>
-							<td>{ optStr(eq.Location) }</td>
-						</tr>
-					}
-				</tbody>
-			</table>
-			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+	if len(data.Items) == 0 {
+		<p class="empty">Оборудование не найдено.</p>
+	} else {
+		<table class="data-table">
+		<thead>
+			<tr>
+				<th>Инв. номер</th>
+				<th>Наименование</th>
+				<th>Модель</th>
+				<th>Заводской номер</th>
+				<th>Дата выпуска</th>
+				<th>Дата прибытия</th>
+				<th>Номер формуляра</th>
+				<th>Статус</th>
+				<th>Место</th>
+				<th>Закреплено</th>
+				<th>Номер карточки</th>
+				<th>Примечание</th>
+			</tr>
+		</thead>
+		<tbody>
+		for _, eq := range data.Items {
+			<tr>
+				<td class="mono">{ eq.InventoryNumber }</td>
+				<td>{ optStr(eq.NomenclatureName) }</td>
+				<td>{ optStr(eq.ModelName) }</td>
+				<td>{ optStr(eq.SerialNumber) }</td>
+				<td>{ formatDateMonthPtr(eq.ManufactureDate) }</td>
+				<td>{ formatDateMonthPtr(eq.ArrivalDate) }</td>
+				<td>{ optStr(eq.FormNumber) }</td>
+				<td>{ StatusLabel(eq.Status) }</td>
+				<td>{ optStr(eq.Location) }</td>
+				<td>{ formatAssignment(eq) }</td>
+				<td>{ formatCardNumber(eq.CardNumber) }</td>
+				<td>{ optStr(eq.Notes) }</td>
+			</tr>
 		}
+		</tbody>
+		</table>
+		<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
+	}
 	</div>
 }
 
@@ -102,56 +113,56 @@ templ equipmentFilterForm(v EquipmentFilterValues) {
 		hx-swap="outerHTML"
 		hx-trigger="input changed delay:300ms, change, submit"
 	>
-		<label>
-			Инв. номер
-			<input type="text" name="inventory_number" value={ v.InventoryNumber } placeholder="ИТ00042"/>
-		</label>
-		<label>
-			Модель
-			<input type="text" name="model_name" value={ v.ModelName } placeholder="Clevo"/>
-		</label>
-		<label>
-			Место
-			<input type="text" name="location" value={ v.Location } placeholder="кабинет"/>
-		</label>
-		<label>
-			Ответственный
-			<input type="text" name="card_full_name" value={ v.CardFullName } placeholder="Иванов"/>
-		</label>
-		<label>
-			Подразделение
-			<input type="text" name="department_name" value={ v.DepartmentName } placeholder="опк"/>
-		</label>
-		<label>
-			Статус
-			<select name="status">
-				if v.Status == "" {
-					<option value="" selected>— любой —</option>
-				} else {
-					<option value="">— любой —</option>
-				}
-				for _, s := range []domain.EquipmentStatus{
-					domain.StatusExp,
-					domain.StatusExpInt,
-					domain.StatusExpSp,
-					domain.StatusBroken,
-					domain.StatusWrittenOff,
-				} {
-					if v.Status == string(s) {
-						<option value={ string(s) } selected>{ StatusLabel(s) }</option>
-					} else {
-						<option value={ string(s) }>{ StatusLabel(s) }</option>
-					}
-				}
-			</select>
-		</label>
-		<a
-			class="filter-reset"
-			hx-get="/ui/equipments"
-			hx-target="#equipment-table"
-			hx-swap="outerHTML"
-			href="/ui/equipments"
-		>Сбросить</a>
+	<label>
+		Инв. номер
+		<input type="text" name="inventory_number" value={ v.InventoryNumber } placeholder="ИТ00042"/>
+	</label>
+	<label>
+		Модель
+		<input type="text" name="model_name" value={ v.ModelName } placeholder="Clevo"/>
+	</label>
+	<label>
+		Место
+		<input type="text" name="location" value={ v.Location } placeholder="кабинет"/>
+	</label>
+	<label>
+		Ответственный
+		<input type="text" name="card_full_name" value={ v.CardFullName } placeholder="Иванов"/>
+	</label>
+	<label>
+		Подразделение
+		<input type="text" name="department_name" value={ v.DepartmentName } placeholder="опк"/>
+	</label>
+	<label>
+		Статус
+		<select name="status">
+		if v.Status == "" {
+			<option value="" selected>— любой —</option>
+		} else {
+			<option value="">— любой —</option>
+		}
+		for _, s := range []domain.EquipmentStatus{
+			domain.StatusExp,
+			domain.StatusExpInt,
+			domain.StatusExpSp,
+			domain.StatusBroken,
+			domain.StatusWrittenOff,
+		} {
+			if v.Status == string(s) {
+				<option value={ string(s) } selected>{ StatusLabel(s) }</option>
+			} else {
+				<option value={ string(s) }>{ StatusLabel(s) }</option>
+			}
+		}
+		</select>
+	</label>
+	<a
+		class="filter-reset"
+		hx-get="/ui/equipments"
+		hx-target="#equipment-table"
+		hx-swap="outerHTML"
+		href="/ui/equipments"
+	>Сбросить</a>
 	</form>
 }
 
@@ -169,4 +180,32 @@ func formatDatePtr(t *time.Time) string {
 		return "—"
 	}
 	return t.Format("02.01.2006")
+}
+
+// formatDateMonthPtr — дата → YYYY.MM, nil/нулевая → тире.
+func formatDateMonthPtr(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return "—"
+	}
+	return t.Format("2006.01")
+}
+
+// formatAssignment — объединённая ячейка «Закреплено»: ФИО ответственного
+// по карточке, либо название подразделения, либо «Склад», если закрепления нет.
+func formatAssignment(eq *domain.Equipment) string {
+	if eq.CardFullName != nil && *eq.CardFullName != "" {
+		return *eq.CardFullName
+	}
+	if eq.DepartmentName != nil && *eq.DepartmentName != "" {
+		return *eq.DepartmentName
+	}
+	return "Склад"
+}
+
+// formatCardNumber — номер карточки → строка, nil → тире.
+func formatCardNumber(n *int) string {
+	if n == nil {
+		return "—"
+	}
+	return fmt.Sprint(*n)
 }

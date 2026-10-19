@@ -156,6 +156,16 @@ body {
   background: #f0f6ff;
 }
 
+/* Таблица оборудования на всю ширину экрана: «вырываем» контейнер
+   из центрированного main#content (max-width 1200px), чтобы по бокам
+   не оставалось пустых областей. */
+#equipment-table {
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  width: 100vw;
+  overflow-x: auto;
+}
+
 .mono {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   white-space: nowrap;
