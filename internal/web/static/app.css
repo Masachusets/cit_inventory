@@ -1,13 +1,64 @@
-/* Базовые стили CIT Inventory: минималистичный каркас layout-страниц. */
+/* ============================================================
+   CIT Inventory — app.css
+   Один файл, встроенный через go:embed (internal/web/embed.go).
+
+   Содержание:
+   1. Tokens        — CSS-переменные (цвета, отступы, радиусы, тени)
+   2. Reset         — box-sizing, body
+   3. Utilities     — утилитные классы (text, bg, border, flex, gap, mono)
+   4. Layout        — site-header, main#content, #equipment-table
+   5. Home          — section-cards, section-card, lead, muted
+   6. Tables        — data-table, empty, table-caption
+   7. Forms         — filter-form, form, form-group, inputs, errors
+   8. Buttons       — btn, btn-primary, action-btn, actions-cell
+   9. Modals        — modal, modal-overlay, modal-content, …
+  10. PageHeader    — page-header, h1, page-actions
+  11. ReducedMotion — prefers-reduced-motion
+============================================================ */
+
+/* ============================================================
+   1. Tokens
+============================================================ */
 
 :root {
+  /* Цвета */
   --color-text: #1a1a1a;
   --color-muted: #5c5c5c;
   --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
   --color-border: #d4d4d4;
   --color-bg: #ffffff;
   --color-bg-subtle: #f5f5f5;
+  --color-error: #991b1b;
+  --color-error-bg: #fef2f2;
+  --color-error-border: #fecaca;
+
+  /* Отступы */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+
+  /* Радиусы */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  /* Тени */
+  --shadow-md: 0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 10px 10px -5px rgb(0 0 0 / 0.04);
+
+  /* Кольцо фокуса (заменяет несуществующее свойство `ring`) */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
+
+  /* Шрифты */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
+
+/* ============================================================
+   2. Reset
+============================================================ */
 
 * {
   box-sizing: border-box;
@@ -15,19 +66,58 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
   color: var(--color-text);
   background: var(--color-bg);
   line-height: 1.5;
 }
 
-/* --- Шапка с навигацией --- */
+/* ============================================================
+   3. Utilities
+============================================================ */
+
+.text-muted {
+  color: var(--color-muted);
+}
+
+.bg-subtle {
+  background: var(--color-bg-subtle);
+}
+
+.border-base {
+  border: 1px solid var(--color-border);
+}
+
+.flex {
+  display: flex;
+}
+
+.gap-2 {
+  gap: var(--space-2);
+}
+
+.gap-3 {
+  gap: var(--space-3);
+}
+
+.block {
+  display: block;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   4. Layout
+============================================================ */
 
 .site-header {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-subtle);
 }
@@ -52,7 +142,25 @@ body {
   color: var(--color-accent);
 }
 
-/* --- Главная страница: карточки разделов --- */
+main#content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+/* Таблица оборудования на всю ширину экрана: «вырываем» контейнер
+   из центрированного main#content (max-width 1200px), чтобы по бокам
+   не оставалось пустых областей. */
+#equipment-table {
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  width: 100vw;
+  overflow-x: auto;
+}
+
+/* ============================================================
+   5. Home
+============================================================ */
 
 .lead {
   color: var(--color-muted);
@@ -62,15 +170,15 @@ body {
 .section-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
 }
 
 .section-card {
   display: block;
-  padding: 1rem;
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   text-decoration: none;
   color: var(--color-text);
   background: var(--color-bg);
@@ -81,57 +189,13 @@ body {
 }
 
 .section-card h2 {
-  margin: 0 0 0.25rem;
+  margin: 0 0 var(--space-1);
   font-size: 1.05rem;
 }
 
-.muted {
-  color: var(--color-muted);
-  font-size: 0.9rem;
-}
-
-/* --- Таблица и фильтры раздела «Оборудование» --- */
-
-.filter-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  align-items: end;
-  margin: 1rem 0 1.25rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-subtle);
-}
-
-.filter-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.85rem;
-  color: var(--color-muted);
-}
-
-.filter-form input,
-.filter-form select {
-  font: inherit;
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  min-width: 9rem;
-}
-
-.filter-reset {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-  padding: 0.35rem 0.5rem;
-}
-
-.filter-reset:hover {
-  color: var(--color-accent);
-}
+/* ============================================================
+   6. Tables
+============================================================ */
 
 .data-table {
   width: 100%;
@@ -142,7 +206,7 @@ body {
 .data-table th,
 .data-table td {
   text-align: left;
-  padding: 0.5rem 0.6rem;
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -156,39 +220,203 @@ body {
   background: #f0f6ff;
 }
 
-/* Таблица оборудования на всю ширину экрана: «вырываем» контейнер
-   из центрированного main#content (max-width 1200px), чтобы по бокам
-   не оставалось пустых областей. */
-#equipment-table {
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
-  width: 100vw;
-  overflow-x: auto;
-}
-
-.mono {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  white-space: nowrap;
-}
-
 .empty {
   color: var(--color-muted);
-  padding: 1.5rem 0;
+  padding: var(--space-6) 0;
 }
 
 .table-caption {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
-/* --- Основное содержимое --- */
+/* ============================================================
+   7. Forms
+============================================================ */
 
-main#content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1.5rem;
+.filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: end;
+  margin: var(--space-4) 0 var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
 }
 
-/* --- Модальные окна --- */
+.filter-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.filter-form input,
+.filter-form select {
+  font: inherit;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-width: 9rem;
+}
+
+.filter-reset {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  padding: var(--space-1) var(--space-2);
+}
+
+.filter-reset:hover {
+  color: var(--color-accent);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.form-input,
+.form-select {
+  font: inherit;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.form-input[readonly] {
+  background: var(--color-bg-subtle);
+  color: var(--color-muted);
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.form-error-global {
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-error);
+  font-size: 0.85rem;
+}
+
+.form-error-global:empty {
+  display: none;
+}
+
+.form-error {
+  color: var(--color-error);
+  font-size: 0.75rem;
+  margin-top: var(--space-1);
+}
+
+.form-input.error,
+.form-select.error {
+  border-color: var(--color-error);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ============================================================
+   8. Buttons
+============================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-weight: 500;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  &--primary {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: #ffffff;
+
+    &:hover {
+      background: var(--color-accent-hover);
+      border-color: var(--color-accent-hover);
+    }
+  }
+}
+
+.actions-cell {
+  white-space: nowrap;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.action-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ============================================================
+   9. Modals
+============================================================ */
 
 .modal {
   position: fixed;
@@ -222,8 +450,8 @@ main#content {
   margin: auto;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
@@ -231,7 +459,7 @@ main#content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-subtle);
   cursor: grab;
@@ -261,7 +489,7 @@ main#content {
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .modal-close:hover {
@@ -270,160 +498,20 @@ main#content {
 }
 
 .modal-body {
-  padding: 1rem;
+  padding: var(--space-4);
   overflow-y: auto;
 }
 
-/* --- Формы --- */
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.form-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--color-muted);
-}
-
-.form-input,
-.form-select {
-  font: inherit;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-
-.form-input:focus,
-.form-select:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  ring: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.form-input[readonly] {
-  background: var(--color-bg-subtle);
-  color: var(--color-muted);
-}
-
-.form-hint {
-  font-size: 0.75rem;
-  color: var(--color-muted);
-}
-
-.form-error-global {
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 4px;
-  color: #991b1b;
-  font-size: 0.85rem;
-}
-
-.form-error-global:empty {
-  display: none;
-}
-
-.form-error {
-  color: #991b1b;
-  font-size: 0.75rem;
-  margin-top: 0.15rem;
-}
-
-.form-input.error,
-.form-select.error {
-  border-color: #991b1b;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--color-border);
-}
-
-/* --- Кнопки --- */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font: inherit;
-  font-weight: 500;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.btn:hover {
-  border-color: var(--color-accent);
-}
-
-.btn:focus-visible {
-  outline: none;
-  ring: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.btn-primary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: #ffffff;
-}
-
-.btn-primary:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-}
-
-/* --- Кнопки действий в таблице --- */
-
-.actions-cell {
-  white-space: nowrap;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font: inherit;
-  font-size: 0.85rem;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.action-btn:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-/* --- Заголовок страницы с кнопкой добавления --- */
+/* ============================================================
+   10. PageHeader
+============================================================ */
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .page-header h1 {
@@ -433,5 +521,20 @@ main#content {
 
 .page-header .page-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
+}
+
+/* ============================================================
+   11. ReducedMotion
+============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
