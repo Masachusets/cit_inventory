@@ -58,14 +58,14 @@ func WaybillCreateModal(data WaybillModalData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"modal\"><div class=\"modal-overlay\" hx-on:click=\"this.closest('.modal').remove()\"><div class=\"modal-content\" role=\"document\" aria-modal=\"true\"><div class=\"modal-header\"><h2 class=\"modal-title\">Новая накладная</h2><button class=\"modal-close\" hx-on:click=\"this.closest('.modal').remove()\" aria-label=\"Закрыть\">×</button></div><div class=\"modal-body\"><div class=\"form-error-global\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"modal\"><div class=\"modal-overlay\"><div class=\"modal-content\" role=\"document\" aria-modal=\"true\"><div class=\"modal-header\"><h2 class=\"modal-title\">Новая накладная</h2><button class=\"modal-close\" hx-on:click=\"this.closest('.modal').remove()\" aria-label=\"Закрыть\">×</button></div><div class=\"modal-body\"><div class=\"form-error-global\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(data.Error)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 48, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 47, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -78,7 +78,7 @@ func WaybillCreateModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.ActionURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 50, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 49, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -91,7 +91,7 @@ func WaybillCreateModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 57, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 56, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -104,7 +104,7 @@ func WaybillCreateModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 61, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 60, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -117,7 +117,7 @@ func WaybillCreateModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.IssueDate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 65, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 64, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -153,14 +153,14 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"modal\"><div class=\"modal-overlay\" hx-on:click=\"this.closest('.modal').remove()\"><div class=\"modal-content\" role=\"document\" aria-modal=\"true\"><div class=\"modal-header\"><h2 class=\"modal-title\">Редактирование накладной №")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"modal\"><div class=\"modal-overlay\"><div class=\"modal-content\" role=\"document\" aria-modal=\"true\"><div class=\"modal-header\"><h2 class=\"modal-title\">Редактирование накладной №")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(data.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 87, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 85, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -173,7 +173,7 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(data.Error)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 95, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 93, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -186,7 +186,7 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.ActionURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 97, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 95, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -199,7 +199,7 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 102, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 100, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -212,7 +212,7 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 105, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 103, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -225,7 +225,7 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 109, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 107, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -238,7 +238,7 @@ func WaybillEditModal(data WaybillModalData) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.IssueDate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 113, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 111, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -294,7 +294,7 @@ func WaybillsListPage(data WaybillsTableData) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Filter.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 146, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 144, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
@@ -307,7 +307,7 @@ func WaybillsListPage(data WaybillsTableData) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.Filter.Number)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 150, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 148, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
@@ -379,7 +379,7 @@ func WaybillsTable(data WaybillsTableData) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(w.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 177, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 175, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -392,7 +392,7 @@ func WaybillsTable(data WaybillsTableData) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(optStr(w.Number))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 178, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 176, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -405,7 +405,7 @@ func WaybillsTable(data WaybillsTableData) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(FormatDatePtr(w.IssueDate))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 179, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 177, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -418,7 +418,7 @@ func WaybillsTable(data WaybillsTableData) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.SafeURL("/ui/waybills/" + strconv.Itoa(w.ID) + "/edit"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 181, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 179, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 				if templ_7745c5c3_Err != nil {
@@ -436,7 +436,7 @@ func WaybillsTable(data WaybillsTableData) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(len(data.Items))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 187, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/waybills.templ`, Line: 185, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
