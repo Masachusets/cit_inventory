@@ -86,14 +86,14 @@ tasks:
     cmd: '{{.TEMPL}} generate --watch'
 
   templ:fmt:
-    desc: Форматирование *.templ (templ fmt -w)
-    cmd: '{{.TEMPL}} fmt -w .'
+    desc: Форматирование *.templ (templ fmt; в installed CLI -w — число воркеров)
+    cmd: '{{.TEMPL}} fmt .'
 
   fmt:
-    desc: Форматирование кода (gofmt -w + templ fmt -w)
+    desc: Форматирование кода (gofmt -w + templ fmt)
     cmds:
       - gofmt -w cmd internal pkg
-      - '{{.TEMPL}} fmt -w .'
+      - '{{.TEMPL}} fmt .'
 
   fmt:check:
     desc: Проверка форматирования кода (без изменений)
