@@ -33,46 +33,6 @@ func (h *PageHandler) Departments(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, web.DepartmentsListPage(data))
 }
 
-// DepartmentsCreate — GET /ui/departments/create: пустая модальная форма создания подразделения.
-func (h *PageHandler) DepartmentsCreate(w http.ResponseWriter, r *http.Request) {
-	data := web.DepartmentModalData{
-		ActionURL: "/ui/departments/create",
-	}
-	h.render(w, r, http.StatusOK, web.DepartmentCreateModal(data))
-}
-
-// DepartmentsCreateSubmit — POST /ui/departments/create: создание подразделения.
-// При succès — HX-Redirect на /ui/departments.
-// При ошибке — перерисовка модалки с сообщением об ошибке.
-func (h *PageHandler) DepartmentsCreateSubmit(w http.ResponseWriter, r *http.Request) {
-	codeStr := strings.TrimSpace(r.FormValue("code"))
-	name := strings.TrimSpace(r.FormValue("name"))
-
-	code, err := strconv.Atoi(codeStr)
-	if err != nil || code <= 0 {
-		h.render(w, r, http.StatusOK, web.DepartmentCreateModal(web.DepartmentModalData{
-			Name:      name,
-			Error:     "Код подразделения должен быть положительным числом.",
-			ActionURL: "/ui/departments/create",
-		}))
-		return
-	}
-
-	_, err = h.departments.Create(r.Context(), code, name)
-	if err != nil {
-		h.render(w, r, http.StatusOK, web.DepartmentCreateModal(web.DepartmentModalData{
-			Code:      code,
-			Name:      name,
-			Error:     domainErrorMessage(err),
-			ActionURL: "/ui/departments/create",
-		}))
-		return
-	}
-
-	w.Header().Set("HX-Redirect", "/ui/departments")
-	w.WriteHeader(http.StatusOK)
-}
-
 // DepartmentsEdit — GET /ui/departments/{code}/edit: модальная форма редактирования подразделения.
 func (h *PageHandler) DepartmentsEdit(w http.ResponseWriter, r *http.Request) {
 	code, ok := parseDepartmentCode(w, r)

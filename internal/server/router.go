@@ -83,9 +83,8 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 		r.Post("/cards/{number}", pages.CardsUpdateSubmit)
 		r.Get("/cards", pages.Cards)
 
-		// Подразделения. Статические маршруты create/edit ДО /departments/{code}.
-		r.Get("/departments/create", pages.DepartmentsCreate)
-		r.Post("/departments/create", pages.DepartmentsCreateSubmit)
+		// Подразделения. Создание подразделения доступно только через API
+		// (/api/v1/departments), в веб-интерфейсе доступно только редактирование.
 		r.Get("/departments/{code}/edit", pages.DepartmentsEdit)
 		r.Post("/departments/{code}", pages.DepartmentsUpdateSubmit)
 		r.Get("/departments", pages.Departments)
