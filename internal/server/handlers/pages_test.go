@@ -19,6 +19,7 @@ func newPageHandlerForTest(
 	departments *stubDepartmentService,
 	nomenclatures *stubNomenclatureService,
 	waybills *stubWaybillService,
+	assignments *stubAssignmentService,
 ) *PageHandler {
 	if equipments == nil {
 		equipments = &stubEquipmentService{}
@@ -35,14 +36,17 @@ func newPageHandlerForTest(
 	if waybills == nil {
 		waybills = &stubWaybillService{}
 	}
-	return NewPageHandler(equipments, cards, departments, nomenclatures, waybills, slog.New(slog.DiscardHandler))
+	if assignments == nil {
+		assignments = &stubAssignmentService{}
+	}
+	return NewPageHandler(equipments, cards, departments, nomenclatures, waybills, assignments, slog.New(slog.DiscardHandler))
 }
 
 // TestPageHandler_Equipments_FullPage проверяет полную страницу списка
 // оборудования: layout, таблица, данные из сервиса.
 func TestPageHandler_Equipments_FullPage(t *testing.T) {
 	svc := &stubEquipmentService{listActive: []*domain.Equipment{activeEquipment()}}
-	h := newPageHandlerForTest(svc, nil, nil, nil, nil)
+	h := newPageHandlerForTest(svc, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/ui/equipments", nil)
 	rr := httptest.NewRecorder()
@@ -74,7 +78,7 @@ func TestPageHandler_Equipments_FullPage(t *testing.T) {
 // (HX-Request: true) получает только фрагмент #equipment-table без layout.
 func TestPageHandler_Equipments_HTMXFragment(t *testing.T) {
 	svc := &stubEquipmentService{listActive: []*domain.Equipment{activeEquipment()}}
-	h := newPageHandlerForTest(svc, nil, nil, nil, nil)
+	h := newPageHandlerForTest(svc, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/ui/equipments", nil)
 	req.Header.Set("HX-Request", "true")
@@ -166,7 +170,7 @@ func TestPageHandler_Equipments_FilterTranslation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &stubEquipmentService{listActive: []*domain.Equipment{}}
-			h := newPageHandlerForTest(svc, nil, nil, nil, nil)
+			h := newPageHandlerForTest(svc, nil, nil, nil, nil, nil)
 
 			req := httptest.NewRequest(http.MethodGet, tt.query, nil)
 			rr := httptest.NewRecorder()
@@ -184,7 +188,7 @@ func TestPageHandler_Equipments_FilterTranslation(t *testing.T) {
 // сервиса (без утечки деталей ошибки в тело).
 func TestPageHandler_Equipments_ServiceError(t *testing.T) {
 	svc := &stubEquipmentService{listErr: domain.ErrNotFound}
-	h := newPageHandlerForTest(svc, nil, nil, nil, nil)
+	h := newPageHandlerForTest(svc, nil, nil, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/ui/equipments", nil)
 	rr := httptest.NewRecorder()
@@ -223,6 +227,7 @@ func sectionHandler(t *testing.T) (*PageHandler, map[string]http.HandlerFunc, ma
 		&stubWaybillService{listItems: []*domain.Waybill{
 			{ID: 1, Name: "Товарная накладная", Number: strPtr("№12"), IssueDate: &when},
 		}},
+		&stubAssignmentService{},
 	)
 	handlers := map[string]http.HandlerFunc{
 		"equipments":    h.Equipments,
@@ -420,22 +425,22 @@ func TestPageHandler_SectionServiceErrors(t *testing.T) {
 		{
 			section: "cards",
 			handler: func(h *PageHandler) http.HandlerFunc { return h.Cards },
-			svc:     newPageHandlerForTest(nil, &stubCardService{listErr: domain.ErrNotFound}, nil, nil, nil),
+			svc:     newPageHandlerForTest(nil, &stubCardService{listErr: domain.ErrNotFound}, nil, nil, nil, nil),
 		},
 		{
 			section: "departments",
 			handler: func(h *PageHandler) http.HandlerFunc { return h.Departments },
-			svc:     newPageHandlerForTest(nil, nil, &stubDepartmentService{listErr: domain.ErrNotFound}, nil, nil),
+			svc:     newPageHandlerForTest(nil, nil, &stubDepartmentService{listErr: domain.ErrNotFound}, nil, nil, nil),
 		},
 		{
 			section: "nomenclatures",
 			handler: func(h *PageHandler) http.HandlerFunc { return h.Nomenclatures },
-			svc:     newPageHandlerForTest(nil, nil, nil, &stubNomenclatureService{listErr: domain.ErrNotFound}, nil),
+			svc:     newPageHandlerForTest(nil, nil, nil, &stubNomenclatureService{listErr: domain.ErrNotFound}, nil, nil),
 		},
 		{
 			section: "waybills",
 			handler: func(h *PageHandler) http.HandlerFunc { return h.Waybills },
-			svc:     newPageHandlerForTest(nil, nil, nil, nil, &stubWaybillService{listErr: domain.ErrNotFound}),
+			svc:     newPageHandlerForTest(nil, nil, nil, nil, &stubWaybillService{listErr: domain.ErrNotFound}, nil),
 		},
 	}
 

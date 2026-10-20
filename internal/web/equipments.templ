@@ -42,15 +42,39 @@ type EquipmentTableData struct {
 	Filter EquipmentFilterValues
 }
 
+// EquipmentModalData — данные модальной формы оборудования (создание и
+// редактирование). Используется одна структура для обоих сценариев:
+// IsEdit различает режимы, NomenclatureID — выбранная номенклатура.
+type EquipmentModalData struct {
+	InventoryNumber string
+	SerialNumber    string
+	NomenclatureID  int
+	ModelName       string
+	ManufactureDate string
+	ArrivalDate     string
+	Status          string
+	FormNumber      string
+	Location        string
+	Notes           string
+	Error           string
+	ActionURL       string
+	Nomenclatures   []*domain.Nomenclature
+	IsEdit          bool
+}
+
 // EquipmentListPage — страница раздела «Оборудование»: форма фильтров и
 // таблица (обновляется через htmx без перезагрузки страницы).
 templ EquipmentListPage(data EquipmentTableData) {
 	@Layout("Оборудование", DefaultNav()) {
 		<div class="page-header">
 			<h1>Оборудование</h1>
+			<div class="page-actions">
+				<button class="btn btn-primary" hx-get="/ui/equipments/create" hx-target="#equipment-modal" hx-swap="innerHTML">Добавить оборудование</button>
+			</div>
 		</div>
 		@equipmentFilterForm(data.Filter)
 		@EquipmentTable(data)
+		<div id="equipment-modal"></div>
 	}
 }
 
@@ -58,47 +82,195 @@ templ EquipmentListPage(data EquipmentTableData) {
 // перезаписывается целиком: и при полной загрузке страницы, и htmx-ответом).
 templ EquipmentTable(data EquipmentTableData) {
 	<div id="equipment-table">
-	if len(data.Items) == 0 {
-		<p class="empty">Оборудование не найдено.</p>
-	} else {
-		<table class="data-table">
-		<thead>
-			<tr>
-				<th>Инв. номер</th>
-				<th>Наименование</th>
-				<th>Модель</th>
-				<th>Заводской номер</th>
-				<th>Дата выпуска</th>
-				<th>Дата прибытия</th>
-				<th>Номер формуляра</th>
-				<th>Статус</th>
-				<th>Место</th>
-				<th>Закреплено</th>
-				<th>Номер карточки</th>
-				<th>Примечание</th>
-			</tr>
-		</thead>
-		<tbody>
-		for _, eq := range data.Items {
-			<tr>
-				<td class="mono">{ eq.InventoryNumber }</td>
-				<td>{ optStr(eq.NomenclatureName) }</td>
-				<td>{ optStr(eq.ModelName) }</td>
-				<td>{ optStr(eq.SerialNumber) }</td>
-				<td>{ formatDateMonthPtr(eq.ManufactureDate) }</td>
-				<td>{ formatDateMonthPtr(eq.ArrivalDate) }</td>
-				<td>{ optStr(eq.FormNumber) }</td>
-				<td>{ StatusLabel(eq.Status) }</td>
-				<td>{ optStr(eq.Location) }</td>
-				<td>{ formatAssignment(eq) }</td>
-				<td>{ formatCardNumber(eq.CardNumber) }</td>
-				<td>{ optStr(eq.Notes) }</td>
-			</tr>
+		if len(data.Items) == 0 {
+			<p class="empty">Оборудование не найдено.</p>
+		} else {
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>Инв. номер</th>
+						<th>Наименование</th>
+						<th>Модель</th>
+						<th>Заводской номер</th>
+						<th>Дата выпуска</th>
+						<th>Дата прибытия</th>
+						<th>Номер формуляра</th>
+						<th>Статус</th>
+						<th>Место</th>
+						<th>Закреплено</th>
+						<th>Номер карточки</th>
+						<th>Примечание</th>
+						<th class="actions-cell">Действия</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, eq := range data.Items {
+						<tr>
+							<td class="mono">{ eq.InventoryNumber }</td>
+							<td>{ optStr(eq.NomenclatureName) }</td>
+							<td>{ optStr(eq.ModelName) }</td>
+							<td>{ optStr(eq.SerialNumber) }</td>
+							<td>{ formatDateMonthPtr(eq.ManufactureDate) }</td>
+							<td>{ formatDateMonthPtr(eq.ArrivalDate) }</td>
+							<td>{ optStr(eq.FormNumber) }</td>
+							<td>{ StatusLabel(eq.Status) }</td>
+							<td>{ optStr(eq.Location) }</td>
+							<td>{ formatAssignment(eq) }</td>
+							<td>{ formatCardNumber(eq.CardNumber) }</td>
+							<td>{ optStr(eq.Notes) }</td>
+							<td class="actions-cell">
+								<button class="action-btn" hx-get={ templ.SafeURL("/ui/equipments/" + eq.InventoryNumber + "/edit") } hx-target="#equipment-modal" hx-swap="innerHTML">Редактировать</button>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
 		}
-		</tbody>
-		</table>
-		<p class="muted table-caption">Всего записей: { len(data.Items) }</p>
-	}
+	</div>
+}
+
+// EquipmentCreateModal — модальное окно создания оборудования.
+templ EquipmentCreateModal(data EquipmentModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Новое оборудование</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#equipment-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						@equipmentFormFields(data)
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// EquipmentEditModal — модальное окно редактирования оборудования.
+templ EquipmentEditModal(data EquipmentModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Редактирование { data.InventoryNumber }</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#equipment-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						@equipmentFormFields(data)
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// equipmentFormFields — общие поля формы оборудования для модалок создания
+// и редактирования. В режиме редактирования инвентарный номер readonly:
+// он является идентификатором и не изменяется.
+templ equipmentFormFields(data EquipmentModalData) {
+	<div class="form-group">
+		<label class="form-label">Инвентарный номер</label>
+		if data.IsEdit {
+			<input type="text" name="inventory_number" value={ data.InventoryNumber } readonly class="form-input"/>
+			<span class="form-hint">Инвентарный номер изменить нельзя.</span>
+		} else {
+			<input type="text" name="inventory_number" value={ data.InventoryNumber } placeholder="ИТ00042" required class="form-input"/>
+		}
+	</div>
+	<div class="form-group">
+		<label class="form-label">Номенклатура</label>
+		<select name="nomenclature_id" class="form-select" required>
+			<option value="">— выберите —</option>
+			for _, n := range data.Nomenclatures {
+				if data.NomenclatureID == n.ID {
+					<option value={ fmt.Sprint(n.ID) } selected>{ n.Code } — { n.Name }</option>
+				} else {
+					<option value={ fmt.Sprint(n.ID) }>{ n.Code } — { n.Name }</option>
+				}
+			}
+		</select>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Модель</label>
+		<input type="text" name="model_name" value={ data.ModelName } maxlength="255" placeholder="Clevo" class="form-input"/>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Заводской номер</label>
+		<input type="text" name="serial_number" value={ data.SerialNumber } maxlength="100" class="form-input"/>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Дата выпуска</label>
+		<input type="date" name="manufacture_date" value={ data.ManufactureDate } class="form-input"/>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Дата прибытия</label>
+		<input type="date" name="arrival_date" value={ data.ArrivalDate } class="form-input"/>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Номер формуляра</label>
+		<input type="text" name="form_number" value={ data.FormNumber } maxlength="10" class="form-input"/>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Статус</label>
+		<select name="status" class="form-select">
+			for _, s := range []domain.EquipmentStatus{
+				domain.StatusExp,
+				domain.StatusExpInt,
+				domain.StatusExpSp,
+				domain.StatusBroken,
+				domain.StatusWrittenOff,
+			} {
+				if data.Status == string(s) {
+					<option value={ string(s) } selected>{ StatusLabel(s) }</option>
+				} else {
+					<option value={ string(s) }>{ StatusLabel(s) }</option>
+				}
+			}
+		</select>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Место</label>
+		<input type="text" name="location" value={ data.Location } maxlength="255" placeholder="кабинет" class="form-input"/>
+	</div>
+	<div class="form-group">
+		<label class="form-label">Примечание</label>
+		<input type="text" name="notes" value={ data.Notes } class="form-input"/>
 	</div>
 }
 
@@ -113,56 +285,56 @@ templ equipmentFilterForm(v EquipmentFilterValues) {
 		hx-swap="outerHTML"
 		hx-trigger="input changed delay:300ms, change, submit"
 	>
-	<label>
-		Инв. номер
-		<input type="text" name="inventory_number" value={ v.InventoryNumber } placeholder="ИТ00042"/>
-	</label>
-	<label>
-		Модель
-		<input type="text" name="model_name" value={ v.ModelName } placeholder="Clevo"/>
-	</label>
-	<label>
-		Место
-		<input type="text" name="location" value={ v.Location } placeholder="кабинет"/>
-	</label>
-	<label>
-		Ответственный
-		<input type="text" name="card_full_name" value={ v.CardFullName } placeholder="Иванов"/>
-	</label>
-	<label>
-		Подразделение
-		<input type="text" name="department_name" value={ v.DepartmentName } placeholder="опк"/>
-	</label>
-	<label>
-		Статус
-		<select name="status">
-		if v.Status == "" {
-			<option value="" selected>— любой —</option>
-		} else {
-			<option value="">— любой —</option>
-		}
-		for _, s := range []domain.EquipmentStatus{
+		<label>
+			Инв. номер
+			<input type="text" name="inventory_number" value={ v.InventoryNumber } placeholder="ИТ00042"/>
+		</label>
+		<label>
+			Модель
+			<input type="text" name="model_name" value={ v.ModelName } placeholder="Clevo"/>
+		</label>
+		<label>
+			Место
+			<input type="text" name="location" value={ v.Location } placeholder="кабинет"/>
+		</label>
+		<label>
+			Ответственный
+			<input type="text" name="card_full_name" value={ v.CardFullName } placeholder="Иванов"/>
+		</label>
+		<label>
+			Подразделение
+			<input type="text" name="department_name" value={ v.DepartmentName } placeholder="опк"/>
+		</label>
+		<label>
+			Статус
+			<select name="status">
+				if v.Status == "" {
+					<option value="" selected>— любой —</option>
+				} else {
+					<option value="">— любой —</option>
+				}
+				for _, s := range []domain.EquipmentStatus{
 			domain.StatusExp,
 			domain.StatusExpInt,
 			domain.StatusExpSp,
 			domain.StatusBroken,
 			domain.StatusWrittenOff,
 		} {
-			if v.Status == string(s) {
-				<option value={ string(s) } selected>{ StatusLabel(s) }</option>
-			} else {
-				<option value={ string(s) }>{ StatusLabel(s) }</option>
-			}
-		}
-		</select>
-	</label>
-	<a
-		class="filter-reset"
-		hx-get="/ui/equipments"
-		hx-target="#equipment-table"
-		hx-swap="outerHTML"
-		href="/ui/equipments"
-	>Сбросить</a>
+					if v.Status == string(s) {
+						<option value={ string(s) } selected>{ StatusLabel(s) }</option>
+					} else {
+						<option value={ string(s) }>{ StatusLabel(s) }</option>
+					}
+				}
+			</select>
+		</label>
+		<a
+			class="filter-reset"
+			hx-get="/ui/equipments"
+			hx-target="#equipment-table"
+			hx-swap="outerHTML"
+			href="/ui/equipments"
+		>Сбросить</a>
 	</form>
 }
 

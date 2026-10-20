@@ -63,10 +63,17 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	// Веб-интерфейс: серверный рендеринг (templ + htmx). Внутри группы —
 	// свой NotFound (HTML вместо JSON API). Страницы разделов зависят от
 	// сервисов, созданных выше в composition root.
-	pages := handlers.NewPageHandler(equipmentSvc, cardSvc, departmentSvc, nomenclatureSvc, waybillSvc, log)
+	pages := handlers.NewPageHandler(equipmentSvc, cardSvc, departmentSvc, nomenclatureSvc, waybillSvc, assignmentSvc, log)
 	r.Route("/ui", func(r chi.Router) {
 		r.Get("/", pages.Home)
 		r.Get("/equipments", pages.Equipments)
+
+		// Оборудование. Статические маршруты create/edit объявлены ДО параметрических,
+		// чтобы chi не перехватил "create"/"edit" как {inventory_number}.
+		r.Get("/equipments/create", pages.EquipmentsCreate)
+		r.Post("/equipments/create", pages.EquipmentsCreateSubmit)
+		r.Get("/equipments/{inventory_number}/edit", pages.EquipmentsEdit)
+		r.Post("/equipments/{inventory_number}", pages.EquipmentsUpdateSubmit)
 
 		// Карточки. Статические маршруты create/edit объявлены ДО параметрических
 		// /cards/{number}, иначе chi перехватит "create"/"edit" как {number}.

@@ -24,6 +24,7 @@ type PageHandler struct {
 	departments   service.DepartmentService
 	nomenclatures service.NomenclatureService
 	waybills      service.WaybillService
+	assignments   service.AssignmentService
 	log           *slog.Logger
 }
 
@@ -34,6 +35,7 @@ func NewPageHandler(
 	departments service.DepartmentService,
 	nomenclatures service.NomenclatureService,
 	waybills service.WaybillService,
+	assignments service.AssignmentService,
 	log *slog.Logger,
 ) *PageHandler {
 	return &PageHandler{
@@ -42,6 +44,7 @@ func NewPageHandler(
 		departments:   departments,
 		nomenclatures: nomenclatures,
 		waybills:      waybills,
+		assignments:   assignments,
 		log:           log,
 	}
 }
@@ -105,6 +108,15 @@ func domainErrorMessage(err error) string {
 		return "Запись используется другим оборудованием."
 	case errors.Is(err, domain.ErrInvalidID):
 		return "Некорректный идентификатор."
+	case errors.Is(err, domain.ErrInvalidInventoryNumber):
+		return "Некорректный инвентарный номер (ожидается ИТxxxxx)."
+	case errors.Is(err, domain.ErrInvalidNomenclature):
+		return "Некорректная ссылка на номенклатуру."
+	case errors.Is(err, domain.ErrInvalidStatus):
+		return "Некорректный статус оборудования."
+	case errors.Is(err, domain.ErrInvalidField):
+		return "Некорректное значение поля."
+
 	default:
 		return "Внутренняя ошибка сервера."
 	}
