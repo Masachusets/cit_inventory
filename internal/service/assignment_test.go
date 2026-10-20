@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
+	"github.com/jackc/pgx/v5"
 )
 
 // ptrInt/ptrTime — краткая запись указателей в тестах пакета service.
@@ -99,6 +100,18 @@ func (f *fakeAssignmentRepo) Delete(_ context.Context, id int) error {
 	}
 	delete(f.items, id)
 	return nil
+}
+
+func (f *fakeAssignmentRepo) CloseActiveForEquipment(_ context.Context, _ int) error {
+	return nil
+}
+
+func (f *fakeAssignmentRepo) CloseActiveForEquipmentWithTx(_ context.Context, _ pgx.Tx, _ int) error {
+	return nil
+}
+
+func (f *fakeAssignmentRepo) CreateWithTx(_ context.Context, _ pgx.Tx, a *domain.Assignment) error {
+	return f.Create(context.Background(), a)
 }
 
 func TestAssignmentService_Create(t *testing.T) {

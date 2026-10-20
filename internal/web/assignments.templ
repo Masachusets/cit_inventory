@@ -1,0 +1,212 @@
+package web
+
+import (
+	"fmt"
+
+	"github.com/Masachusets/cit_inventory/internal/domain"
+)
+
+// EquipmentAssignModalData — данные модальной формы изменения закрепления.
+type EquipmentAssignModalData struct {
+	InventoryNumber  string
+	TargetType       string // employee / department / warehouse
+	CardNumber       string
+	DepartmentCode   int16
+	WaybillID        int
+	WaybillNumber    string
+	WaybillName      string
+	WaybillIssueDate string
+	OperatorComment  string
+	Error            string
+	ActionURL        string
+	Cards            []*domain.Card
+	Departments      []*domain.Department
+	Waybills         []*domain.Waybill
+	IsNewWaybill     bool
+}
+
+// checkedAttr возвращает строку "checked" если значение совпадает, иначе пустую.
+func checkedAttr(current, value string) string {
+	if current == value {
+		return "checked"
+	}
+	return ""
+}
+
+// boolCheckedAttr возвращает "checked" если флаг true, иначе пустую.
+func boolCheckedAttr(v bool) string {
+	if v {
+		return "checked"
+	}
+	return ""
+}
+
+// EquipmentAssignForm — модальное окно изменения закрепления оборудования.
+templ EquipmentAssignForm(data EquipmentAssignModalData) {
+	<div class="modal">
+		<div
+			class="modal-overlay"
+		>
+			<div class="modal-content" role="document" aria-modal="true">
+				<div class="modal-header">
+					<h2 class="modal-title">Изменить закрепление: { data.InventoryNumber }</h2>
+					<button
+						class="modal-close"
+						hx-on:click="this.closest('.modal').remove()"
+						aria-label="Закрыть"
+					>×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-error-global">{ data.Error }</div>
+					<form
+						hx-post={ data.ActionURL }
+						hx-target="#equipment-modal"
+						hx-swap="innerHTML"
+						class="form"
+					>
+						<input type="hidden" name="inventory_number" value={ data.InventoryNumber }/>
+						<div class="form-group">
+							<label class="form-label">Цель закрепления</label>
+							<div class="radio-group">
+								<label class="radio-label">
+									<input type="radio" name="target_type" value="employee" { checkedAttr(data.TargetType, "employee") } hx-get={ templ.SafeURL("/ui/equipments/" + data.InventoryNumber + "/assign/fields?target_type=employee") } hx-include="closest form" hx-target="#assign-fields" hx-swap="innerHTML" required/>
+									Сотрудник
+								</label>
+								<label class="radio-label">
+									<input type="radio" name="target_type" value="department" { checkedAttr(data.TargetType, "department") } hx-get={ templ.SafeURL("/ui/equipments/" + data.InventoryNumber + "/assign/fields?target_type=department") } hx-include="closest form" hx-target="#assign-fields" hx-swap="innerHTML" required/>
+									Подразделение
+								</label>
+								<label class="radio-label">
+									<input type="radio" name="target_type" value="warehouse" { checkedAttr(data.TargetType, "warehouse") } hx-get={ templ.SafeURL("/ui/equipments/" + data.InventoryNumber + "/assign/fields?target_type=warehouse") } hx-include="closest form" hx-target="#assign-fields" hx-swap="innerHTML" required/>
+									Склад
+								</label>
+							</div>
+						</div>
+						<div id="assign-fields">
+							@assignTargetFields(data)
+						</div>
+						<div class="form-group">
+							<label class="form-label">Комментарий оператора</label>
+							<textarea name="operator_comment" class="form-input" placeholder="Комментарий к закреплению">{ data.OperatorComment }</textarea>
+						</div>
+						<div class="form-actions">
+							<button type="button" class="btn" hx-on:click="this.closest('.modal').remove()">Отмена</button>
+							<button type="submit" class="btn btn-primary">Сохранить</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// assignTargetFields — поля в зависимости от выбранной цели закрепления.
+// Для department/warehouse дополнительно выводится блок накладной; для
+// employee накладная не показывается.
+templ assignTargetFields(data EquipmentAssignModalData) {
+	if data.TargetType == "employee" {
+		<div class="form-group">
+			<label class="form-label">Номер карточки сотрудника</label>
+			<input type="number" name="card_number" value={ data.CardNumber } min="1" placeholder="Номер карточки" class="form-input"/>
+			<select name="card_number_select" class="form-input" hx-on:change="this.form.querySelector('[name=card_number]').value = this.value">
+				<option value="">— выберите карточку —</option>
+				for _, c := range data.Cards {
+					if fmtInt(c.Number) == data.CardNumber {
+						<option value={ c.Number } selected>{ c.FullName }</option>
+					} else {
+						<option value={ c.Number }>{ c.FullName }</option>
+					}
+				}
+			</select>
+		</div>
+	} else if data.TargetType == "department" {
+		<div class="form-group">
+			<label class="form-label">Подразделение</label>
+			<select name="department_code" class="form-input" required>
+				<option value="">— выберите подразделение —</option>
+				for _, d := range data.Departments {
+					if d.Code == data.DepartmentCode {
+						<option value={ d.Code } selected>{ d.Name }</option>
+					} else {
+						<option value={ d.Code }>{ d.Name }</option>
+					}
+				}
+			</select>
+		</div>
+		@assignWaybillGroup(data)
+	} else {
+		<p class="muted">Закрепление на складе. Дополнительные поля не требуются.</p>
+		@assignWaybillGroup(data)
+	}
+}
+
+// assignWaybillGroup — блок выбора накладной (radio + динамические поля).
+// Выводится только для целей department/warehouse: для сотрудника накладная
+// не требуется.
+templ assignWaybillGroup(data EquipmentAssignModalData) {
+	<div class="form-group">
+		<label class="form-label">Накладная</label>
+		<div class="radio-group">
+			<label class="radio-label">
+				<input type="radio" name="waybill_mode" value="existing" { boolCheckedAttr(!data.IsNewWaybill) } hx-get={ templ.SafeURL("/ui/equipments/" + data.InventoryNumber + "/assign/waybill-fields?mode=existing") } hx-target="#waybill-fields" hx-swap="innerHTML" required/>
+				Существующая
+			</label>
+			<label class="radio-label">
+				<input type="radio" name="waybill_mode" value="new" { boolCheckedAttr(data.IsNewWaybill) } hx-get={ templ.SafeURL("/ui/equipments/" + data.InventoryNumber + "/assign/waybill-fields?mode=new") } hx-target="#waybill-fields" hx-swap="innerHTML" required/>
+				Новая
+			</label>
+		</div>
+	</div>
+	<div id="waybill-fields">
+		@assignWaybillFields(data)
+	</div>
+}
+
+// assignWaybillFields — поля накладной в зависимости от режима.
+templ assignWaybillFields(data EquipmentAssignModalData) {
+	if data.IsNewWaybill {
+		<div class="form-group">
+			<label class="form-label">Наименование накладной</label>
+			<input type="text" name="waybill_name" value={ data.WaybillName } maxlength="50" placeholder="Путевой лист" required class="form-input"/>
+		</div>
+		<div class="form-group">
+			<label class="form-label">Номер документа</label>
+			<input type="text" name="waybill_number" value={ data.WaybillNumber } maxlength="50" placeholder="123/2026" class="form-input"/>
+		</div>
+		<div class="form-group">
+			<label class="form-label">Дата документа</label>
+			<input type="date" name="waybill_issue_date" value={ data.WaybillIssueDate } class="form-input"/>
+		</div>
+	} else {
+		<div class="form-group">
+			<label class="form-label">Существующая накладная</label>
+			<select name="waybill_id" class="form-input">
+				<option value="0">— без накладной —</option>
+				for _, w := range data.Waybills {
+					if w.ID == data.WaybillID {
+						<option value={ w.ID } selected>{ w.Name } — { optStr(w.Number) } ({ FormatDatePtr(w.IssueDate) })</option>
+					} else {
+						<option value={ w.ID }>{ w.Name } — { optStr(w.Number) } ({ FormatDatePtr(w.IssueDate) })</option>
+					}
+				}
+			</select>
+		</div>
+	}
+}
+
+// fmtInt — форматирует int как строку.
+func fmtInt(v int) string {
+	return fmt.Sprint(v)
+}
+
+// AssignTargetFieldsFragment — фрагмент полей цели закрепления для htmx-обмена
+// (hx-get /assign/fields → innerHTML #assign-fields).
+templ AssignTargetFieldsFragment(data EquipmentAssignModalData) {
+	@assignTargetFields(data)
+}
+
+// AssignWaybillFieldsFragment — фрагмент полей накладной для htmx-обмена
+// (hx-get /assign/waybill-fields → innerHTML #waybill-fields).
+templ AssignWaybillFieldsFragment(data EquipmentAssignModalData) {
+	@assignWaybillFields(data)
+}

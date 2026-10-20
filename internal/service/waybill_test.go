@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
+	"github.com/jackc/pgx/v5"
 )
 
 // fakeWaybillRepo — in-memory реализация repository.WaybillRepository
@@ -25,9 +26,23 @@ func (f *fakeWaybillRepo) Create(_ context.Context, wb *domain.Waybill) error {
 	f.seq++
 	// Присваиваем ID исходному объекту (сервис возвращает его же).
 	wb.ID = f.seq
-	cp := *wb
-	f.items[cp.ID] = &cp
+	tcp := *wb
+	f.items[tcp.ID] = &tcp
 	return nil
+}
+
+func (f *fakeWaybillRepo) CreateWithID(_ context.Context, wb *domain.Waybill) (int, error) {
+	if err := f.Create(context.Background(), wb); err != nil {
+		return 0, err
+	}
+	return wb.ID, nil
+}
+
+func (f *fakeWaybillRepo) CreateWithIDWithTx(_ context.Context, _ pgx.Tx, wb *domain.Waybill) (int, error) {
+	if err := f.Create(context.Background(), wb); err != nil {
+		return 0, err
+	}
+	return wb.ID, nil
 }
 
 func (f *fakeWaybillRepo) GetByID(_ context.Context, id int) (*domain.Waybill, error) {
@@ -35,8 +50,8 @@ func (f *fakeWaybillRepo) GetByID(_ context.Context, id int) (*domain.Waybill, e
 	if !ok {
 		return nil, domain.ErrNotFound
 	}
-	cp := *wb
-	return &cp, nil
+	tcp := *wb
+	return &tcp, nil
 }
 
 func (f *fakeWaybillRepo) List(_ context.Context, filter domain.WaybillFilter) ([]*domain.Waybill, error) {

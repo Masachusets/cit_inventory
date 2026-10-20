@@ -177,6 +177,45 @@ func (r *AssignmentRepo) Update(ctx context.Context, id int, a *domain.Assignmen
 	return nil
 }
 
+// CloseActiveForEquipment закрывает все активные закрепления для оборудования.
+func (r *AssignmentRepo) CloseActiveForEquipment(ctx context.Context, equipmentID int) error {
+	_, err := r.pool.Exec(ctx, `
+        UPDATE equipments_assignments
+        SET unassigned_at = NOW()
+        WHERE equipment_id = $1 AND unassigned_at IS NULL`, equipmentID)
+	if err != nil {
+		return fmt.Errorf("close active assignments for equipment %d: %w", equipmentID, err)
+	}
+	return nil
+}
+
+// CloseActiveForEquipmentWithTx — то же самое в переданной транзакции.
+func (r *AssignmentRepo) CloseActiveForEquipmentWithTx(ctx context.Context, tx pgx.Tx, equipmentID int) error {
+	_, err := tx.Exec(ctx, `
+        UPDATE equipments_assignments
+        SET unassigned_at = NOW()
+        WHERE equipment_id = $1 AND unassigned_at IS NULL`, equipmentID)
+	if err != nil {
+		return fmt.Errorf("close active assignments for equipment %d: %w", equipmentID, err)
+	}
+	return nil
+}
+
+// CreateWithTx создаёт закрепление в переданной транзакции.
+func (r *AssignmentRepo) CreateWithTx(ctx context.Context, tx pgx.Tx, a *domain.Assignment) error {
+	row := tx.QueryRow(ctx, `
+        INSERT INTO equipments_assignments (`+assignmentColumns+`)
+        VALUES ($1, $2::assignment_target, $3, $4, $5, $6, $7, $8)
+        RETURNING id`,
+		a.EquipmentID, string(a.TargetType), a.CardNumber, a.DepartmentCode,
+		a.WaybillID, a.AssignedAt, a.UnassignedAt, a.OperatorComment,
+	)
+	if err := row.Scan(&a.ID); err != nil {
+		return mapAssignmentPgError(err, fmt.Sprintf("insert assignment equipment_id %d", a.EquipmentID))
+	}
+	return nil
+}
+
 func (r *AssignmentRepo) Delete(ctx context.Context, id int) error {
 	tag, err := r.pool.Exec(ctx, `
         DELETE FROM equipments_assignments WHERE id = $1`, id)

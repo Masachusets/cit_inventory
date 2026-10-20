@@ -27,6 +27,9 @@ type AssignmentService interface {
 	// Delete физически удаляет запись истории и возвращает удалённую запись.
 	// Отсутствующая запись — domain.ErrNotFound.
 	Delete(ctx context.Context, id int) (*domain.Assignment, error)
+	// CloseActiveForEquipment закрывает все активные закрепления для указанного
+	// оборудования (unassigned_at = NOW()).
+	CloseActiveForEquipment(ctx context.Context, equipmentID int) error
 }
 
 // AssignmentServiceImpl — реализация AssignmentService поверх AssignmentRepository.
@@ -78,6 +81,10 @@ func (s *AssignmentServiceImpl) Update(ctx context.Context, id int, up domain.As
 		return nil, err
 	}
 	return s.repo.GetByID(ctx, id)
+}
+
+func (s *AssignmentServiceImpl) CloseActiveForEquipment(ctx context.Context, equipmentID int) error {
+	return s.repo.CloseActiveForEquipment(ctx, equipmentID)
 }
 
 func (s *AssignmentServiceImpl) Delete(ctx context.Context, id int) (*domain.Assignment, error) {

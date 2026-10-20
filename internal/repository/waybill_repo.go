@@ -44,6 +44,44 @@ func (r *WaybillRepo) Create(ctx context.Context, wb *domain.Waybill) error {
 	return nil
 }
 
+// CreateWithID вставляет новый путевой лист и возвращает присвоенный id.
+func (r *WaybillRepo) CreateWithID(ctx context.Context, wb *domain.Waybill) (int, error) {
+	var id int
+	err := r.pool.QueryRow(ctx, `
+        INSERT INTO waybills (name, number, issue_date)
+        VALUES ($1, $2, $3)
+        RETURNING id`,
+		wb.Name, wb.Number, wb.IssueDate,
+	).Scan(&id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			return 0, fmt.Errorf("%w: номер %v", domain.ErrAlreadyExists, derefString(wb.Number))
+		}
+		return 0, fmt.Errorf("insert waybill: %w", err)
+	}
+	return id, nil
+}
+
+// CreateWithIDWithTx вставляет новый путевой лист в транзакции и возвращает id.
+func (r *WaybillRepo) CreateWithIDWithTx(ctx context.Context, tx pgx.Tx, wb *domain.Waybill) (int, error) {
+	var id int
+	err := tx.QueryRow(ctx, `
+        INSERT INTO waybills (name, number, issue_date)
+        VALUES ($1, $2, $3)
+        RETURNING id`,
+		wb.Name, wb.Number, wb.IssueDate,
+	).Scan(&id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			return 0, fmt.Errorf("%w: номер %v", domain.ErrAlreadyExists, derefString(wb.Number))
+		}
+		return 0, fmt.Errorf("insert waybill: %w", err)
+	}
+	return id, nil
+}
+
 func (r *WaybillRepo) GetByID(ctx context.Context, id int) (*domain.Waybill, error) {
 	row := r.pool.QueryRow(ctx, `
         SELECT `+waybillColumns+` FROM waybills WHERE id = $1`, id)

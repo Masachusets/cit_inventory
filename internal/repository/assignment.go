@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
+	"github.com/jackc/pgx/v5"
 )
 
 // AssignmentRepository — контракт хранилища закреплений оборудования
@@ -28,4 +29,11 @@ type AssignmentRepository interface {
 	// Delete физически удаляет запись истории (таблица без deleted_at).
 	// Отсутствующая запись — domain.ErrNotFound.
 	Delete(ctx context.Context, id int) error
+	// CloseActiveForEquipment закрывает все активные закрепления (unassigned_at IS NULL)
+	// для указанного оборудования, устанавливая unassigned_at = NOW().
+	CloseActiveForEquipment(ctx context.Context, equipmentID int) error
+	// CloseActiveForEquipmentWithTx — то же самое в переданной транзакции.
+	CloseActiveForEquipmentWithTx(ctx context.Context, tx pgx.Tx, equipmentID int) error
+	// CreateWithTx создаёт закрепление в переданной транзакции.
+	CreateWithTx(ctx context.Context, tx pgx.Tx, a *domain.Assignment) error
 }

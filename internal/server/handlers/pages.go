@@ -116,6 +116,10 @@ func domainErrorMessage(err error) string {
 		return "Некорректный статус оборудования."
 	case errors.Is(err, domain.ErrInvalidField):
 		return "Некорректное значение поля."
+	case errors.Is(err, domain.ErrInvalidTarget):
+		return "Некорректная комбинация цели закрепления и ссылок."
+	case errors.Is(err, domain.ErrInvalidReference):
+		return "Некорректная ссылка на связанную запись."
 
 	default:
 		return "Внутренняя ошибка сервера."

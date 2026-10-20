@@ -64,16 +64,27 @@ func NewRouter(log *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	// свой NotFound (HTML вместо JSON API). Страницы разделов зависят от
 	// сервисов, созданных выше в composition root.
 	pages := handlers.NewPageHandler(equipmentSvc, cardSvc, departmentSvc, nomenclatureSvc, waybillSvc, assignmentSvc, log)
+	equipAssign := handlers.NewEquipmentAssignHandler(
+		assignmentSvc, equipmentSvc, cardSvc, departmentSvc, waybillSvc,
+		assignmentRepo, waybillRepo, pool, log,
+	)
 	r.Route("/ui", func(r chi.Router) {
 		r.Get("/", pages.Home)
 		r.Get("/equipments", pages.Equipments)
 
-		// Оборудование. Статические маршруты create/edit объявлены ДО параметрических,
-		// чтобы chi не перехватил "create"/"edit" как {inventory_number}.
+		// Оборудование. Статические маршруты create/edit/assign объявлены ДО параметрических,
+		// чтобы chi не перехватил "create"/"edit"/"assign" как {inventory_number}.
 		r.Get("/equipments/create", pages.EquipmentsCreate)
 		r.Post("/equipments/create", pages.EquipmentsCreateSubmit)
 		r.Get("/equipments/{inventory_number}/edit", pages.EquipmentsEdit)
 		r.Post("/equipments/{inventory_number}", pages.EquipmentsUpdateSubmit)
+		r.Get("/equipments/{inventory_number}/assign", equipAssign.EquipmentsAssign)
+		r.Post("/equipments/{inventory_number}/assign", equipAssign.EquipmentsAssignSubmit)
+
+		// Частичные фрагменты формы закрепления (htmx подменяет поля
+		// #assign-fields / #waybill-fields при переключении radio).
+		r.Get("/equipments/{inventory_number}/assign/fields", equipAssign.EquipmentsAssignFields)
+		r.Get("/equipments/{inventory_number}/assign/waybill-fields", equipAssign.EquipmentsAssignWaybillFields)
 
 		// Карточки. Статические маршруты create/edit объявлены ДО параметрических
 		// /cards/{number}, иначе chi перехватит "create"/"edit" как {number}.

@@ -120,6 +120,7 @@ templ EquipmentTable(data EquipmentTableData) {
 							<td>{ optStr(eq.Notes) }</td>
 							<td class="actions-cell">
 								<button class="action-btn" hx-get={ templ.SafeURL("/ui/equipments/" + eq.InventoryNumber + "/edit") } hx-target="#equipment-modal" hx-swap="innerHTML">Редактировать</button>
+								<button class="action-btn" hx-get={ templ.SafeURL("/ui/equipments/" + eq.InventoryNumber + "/assign") } hx-target="#equipment-modal" hx-swap="innerHTML">Изменить закрепление</button>
 							</td>
 						</tr>
 					}

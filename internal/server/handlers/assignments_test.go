@@ -53,6 +53,10 @@ func (s *stubAssignmentService) Delete(_ context.Context, _ int) (*domain.Assign
 	return s.deleteResult, s.deleteErr
 }
 
+func (s *stubAssignmentService) CloseActiveForEquipment(_ context.Context, _ int) error {
+	return nil
+}
+
 // assignmentWithRelations — запись со всеми вложенными сущностями для проверки
 // формата JSON-ответа.
 func assignmentWithRelations() *domain.Assignment {

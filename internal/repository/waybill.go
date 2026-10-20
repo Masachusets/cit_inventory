@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Masachusets/cit_inventory/internal/domain"
+	"github.com/jackc/pgx/v5"
 )
 
 // WaybillRepository — контракт хранилища путевых листов. Реализация живёт
@@ -12,6 +13,11 @@ type WaybillRepository interface {
 	// Create вставляет новый путевой лист. При существующем номере
 	// (UNIQUE) — domain.ErrAlreadyExists.
 	Create(ctx context.Context, wb *domain.Waybill) error
+	// CreateWithID вставляет новый путевой лист и возвращает присвоенный id.
+	// При существующем номере (UNIQUE) — domain.ErrAlreadyExists.
+	CreateWithID(ctx context.Context, wb *domain.Waybill) (int, error)
+	// CreateWithIDWithTx вставляет новый путевой лист в транзакции и возвращает id.
+	CreateWithIDWithTx(ctx context.Context, tx pgx.Tx, wb *domain.Waybill) (int, error)
 	// GetByID возвращает путевой лист по идентификатору либо domain.ErrNotFound.
 	GetByID(ctx context.Context, id int) (*domain.Waybill, error)
 	// List возвращает путевые листы, отфильтрованные по заданным полям
